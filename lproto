@@ -1,0 +1,5 @@
+NAME        DONE    NULL_CHECKS?
+
+MODULE      [x]     response and modules = 0
+RSDP        [x]     response and address
+EFIMEMMAP   [x]     response is null

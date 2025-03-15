@@ -6,9 +6,9 @@ MAKEFLAGS += -rR
 ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 4G -debugcon stdio
+QEMUFLAGS := -m 2G
 
-override IMAGE_NAME := atlas_os_$(ARCH)
+override IMAGE_NAME := atlas_os-$(ARCH)
 
 # Toolchain for building the 'limine' executable for the host.
 HOST_CC := cc
@@ -34,7 +34,7 @@ run-x86_64: ovmf/ovmf-code-$(ARCH).fd $(IMAGE_NAME).iso
 	qemu-system-$(ARCH) \
 		-M q35 \
 		-drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-$(ARCH).fd,readonly=on \
-		-drive file=$(IMAGE_NAME).iso,format=raw,if=ide \
+		-cdrom $(IMAGE_NAME).iso \
 		$(QEMUFLAGS)
 
 .PHONY: run-hdd-x86_64
@@ -126,7 +126,11 @@ run-hdd-loongarch64: ovmf/ovmf-code-$(ARCH).fd $(IMAGE_NAME).hdd
 
 .PHONY: run-bios
 run-bios: $(IMAGE_NAME).iso
-	qemu-system-x86_64 -drive file=$(IMAGE_NAME).iso,format=raw,if=ide $(QEMUFLAGS)
+	qemu-system-$(ARCH) \
+		-M q35 \
+		-cdrom $(IMAGE_NAME).iso \
+		-boot d \
+		$(QEMUFLAGS)
 
 .PHONY: run-hdd-bios
 run-hdd-bios: $(IMAGE_NAME).hdd
@@ -145,7 +149,7 @@ ovmf/ovmf-code-$(ARCH).fd:
 
 limine/limine:
 	rm -rf limine
-	git clone https://github.com/limine-bootloader/limine.git --branch=v8.x-binary --depth=1
+	git clone https://github.com/limine-bootloader/limine.git --branch=v9.x-binary --depth=1
 	$(MAKE) -C limine \
 		CC="$(HOST_CC)" \
 		CFLAGS="$(HOST_CFLAGS)" \
@@ -164,7 +168,12 @@ kernel: kernel-deps
 $(IMAGE_NAME).iso: limine/limine kernel
 	rm -rf iso_root
 	mkdir -p iso_root/boot
-	cp -v kernel/bin-$(ARCH)/kernel iso_root/boot/
+	cp -v kernel/bin-$(ARCH)/kernel64.sysaxf iso_root/boot/
+	mkdir -p iso_root/boot/sys64
+	cp -v kernel/bin-$(ARCH)/initramfs.axf iso_root/boot/sys64/initramfs.axf
+	mkdir -p iso_root/boot/sys64/fonts
+	cp -v kernel/bin-$(ARCH)/zap-light16.psf iso_root/boot/sys64/fonts/zap-light16.psf
+	cp -v kernel/bin-$(ARCH)/kern64.config iso_root/boot/sys64/kern64.config
 	mkdir -p iso_root/boot/limine
 	cp -v limine.conf iso_root/boot/limine/
 	mkdir -p iso_root/EFI/BOOT
@@ -211,9 +220,11 @@ endif
 $(IMAGE_NAME).hdd: limine/limine kernel
 	rm -f $(IMAGE_NAME).hdd
 	dd if=/dev/zero bs=1M count=0 seek=64 of=$(IMAGE_NAME).hdd
-	PATH=$$PATH:/usr/sbin:/sbin sgdisk $(IMAGE_NAME).hdd -n 1:2048 -t 1:ef00
 ifeq ($(ARCH),x86_64)
+	PATH=$$PATH:/usr/sbin:/sbin sgdisk $(IMAGE_NAME).hdd -n 1:2048 -t 1:ef00 -m 1
 	./limine/limine bios-install $(IMAGE_NAME).hdd
+else
+	PATH=$$PATH:/usr/sbin:/sbin sgdisk $(IMAGE_NAME).hdd -n 1:2048 -t 1:ef00
 endif
 	mformat -i $(IMAGE_NAME).hdd@@1M
 	mmd -i $(IMAGE_NAME).hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine

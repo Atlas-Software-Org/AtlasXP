@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "coroutine": "cpp",
+        "bitset": "c",
+        "gfx.h": "c",
+        "ranges": "c"
+    }
+}

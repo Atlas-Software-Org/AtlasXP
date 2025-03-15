@@ -35,7 +35,6 @@ SECTIONS
 
     .text : {
         *(.text .text.*)
-        *(._HtKernel)
     } :text
 
     /* Move to the next memory page for .rodata */
