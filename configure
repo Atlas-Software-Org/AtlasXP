@@ -1,0 +1,8 @@
+#!/bin/env sh
+
+git clone --depth 1 https://codeberg.org/mintsuki/flanterm.git ./kernel/src/flanterm
+echo "Cloned flanterm successfully..."
+
+echo "Run the OS with 'make run'"
+echo "Compile the OS with 'make'"
+echo "Prerequisites: clang, ld.lld, make"

@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "cstddef": "cpp",
+        "cstdint": "cpp",
+        "paging.h": "c"
+    }
+}

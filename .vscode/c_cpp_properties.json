@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/kernel/freestnd-c-hdrs/x86_64/include/*",
+                "${workspaceFolder}/kernel/freestnd-cxx-hdrs/x86_64/include/*",
+                "${workspaceFolder}/kernel/src"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64"
+        }
+    ],
+    "version": 4
+}
