@@ -1,6 +1,0 @@
-/kernel-deps
-/limine
-/ovmf
-*.iso
-*.hdd
-disk.img
