@@ -8,16 +8,19 @@
 #include <limine.h>
 
 #include <flanterm/flanterm.h>
-#include <flanterm/backends/fb.h>
+#include <flanterm/flanterm_backends/fb.h>
 #include <printk/printk.h>
 
 #include <GDT/gdt.h>
 #include <IDT/idt.h>
-#include <Syscalls/Syscalls.h>
 #include <PMM/pmm.h>
-#include <Paging/paging.h>
+#include <VMM/vmm.h>
 
 #include <Drivers/PS2Keyboard.h>
+
+#include <ELF/elf.h>
+
+#include <elftest.h>
 
 __attribute__((used, section(".limine_requests")))
 static volatile LIMINE_BASE_REVISION(3);
@@ -105,19 +108,14 @@ void KiStartupInit(void) {
      *          -> Prepare simple shell... (If the steps above (related to the userspace) are skiped)
      */
 
-    printk("{ LOG }\tBooting up Atlas...\n\r");
-    printk("{ LOG }\tAtlas version 0.0.7...\n\r");
-
     extern char a_endKernel[];
     extern char a_endKernelA[];
     uint64_t endKernel = (uint64_t)&a_endKernel;
     uint64_t endKernelAligned = (uint64_t)&a_endKernelA;
 
-    printk("{ LOG }\tEnd kernel (memory): %llu / %lx\n\r", endKernel, endKernel);
-    printk("{ LOG }\tEnd kernel (memory) / Aligned to 0x1000: %llu / %lx\n\r", endKernelAligned, endKernelAligned);
-
     KiGdtInit();
     idtr_t idtr = KiIdtInit();
+    (void)idtr;
 
     uint8_t bitmap_mem[(0x16636F60 / 0x1000 + 7) / 8];  /* preallocated bitmap */
 
@@ -127,25 +125,9 @@ void KiStartupInit(void) {
         hcf();
     }
 
-    /* PMM TESTS START */
-    printk("{ LOG }\tPMM initialized: total pages = %zu, free pages = %zu\n",
-           KiPmmGetTotalPages(), KiPmmGetFreePages());
+    printk("\e[2J\e[H");
 
-    void* frame = KiPmmAlloc();
-    if (frame == -1) {
-        printk("{ LOG }\tFailed to allocate a page\n");
-        hcf();
-    }
-
-    printk("{ LOG }\tAllocated page frame: %p\n", frame);
-    printk("{ LOG }\tFree pages after allocation: %zu\n", KiPmmGetFreePages());
-
-    KiPmmFree((size_t)frame);
-
-    printk("{ LOG }\tFree pages after free: %zu\n", KiPmmGetFreePages());
-    /* PMM TESTS END */
-
-    printk("Test suceeded...\n\r");
+    LoadKernelElf(elftestelf);    
 
     hcf();
 }

@@ -2,6 +2,7 @@
     "files.associations": {
         "cstddef": "cpp",
         "cstdint": "cpp",
-        "paging.h": "c"
+        "paging.h": "c",
+        "ps2keyboard.h": "c"
     }
 }

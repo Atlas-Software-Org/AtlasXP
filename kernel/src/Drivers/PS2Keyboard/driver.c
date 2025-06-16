@@ -154,32 +154,6 @@ void KeyboardDriverMain(uint8_t scancode) {
             extended = false;
             return;
         }
-        switch (scancode) {
-            case 0x48: // Up arrow
-                KbdFlushCheck('\x1B');
-                KbdFlushCheck('[');
-                KbdFlushCheck('A');
-                printk("\x1B[A");
-                break;
-            case 0x50: // Down arrow
-                KbdFlushCheck('\x1B');
-                KbdFlushCheck('[');
-                KbdFlushCheck('B');
-                printk("\x1B[B");
-                break;
-            case 0x4B: // Left arrow
-                KbdFlushCheck('\x1B');
-                KbdFlushCheck('[');
-                KbdFlushCheck('D');
-                printk("\x1B[D");
-                break;
-            case 0x4D: // Right arrow
-                KbdFlushCheck('\x1B');
-                KbdFlushCheck('[');
-                KbdFlushCheck('C');
-                printk("\x1B[C");
-                break;
-        }
 
         __global_keyboard_autoflush = old_autoflush;
         extended = false;

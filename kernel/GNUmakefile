@@ -216,40 +216,45 @@ all: bin-$(ARCH)/$(OUTPUT)
 
 # Link rules for the final executable.
 bin-$(ARCH)/$(OUTPUT): GNUmakefile linker-$(ARCH).ld $(OBJ)
-	mkdir -p "$$(dirname $@)"
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(OBJ) -o $@
+	@mkdir -p "$$(dirname $@)"
+	@$(CXX) $(CXXFLAGS) $(LDFLAGS) $(OBJ) -o $@
+	@echo "  LD\t$@"
 
 # Compilation rules for *.c files.
 obj-$(ARCH)/%.c.o: src/%.c GNUmakefile
-	mkdir -p "$$(dirname $@)"
-	$(CC) $(CFLAGS) $(CPPFLAGS_C) -c $< -o $@
+	@mkdir -p "$$(dirname $@)"
+	@$(CC) $(CFLAGS) $(CPPFLAGS_C) -c $< -o $@
+	@echo "  CC\t$@"
 
 # Compilation rules for *.cpp files.
 obj-$(ARCH)/%.cpp.o: src/%.cpp GNUmakefile
-	mkdir -p "$$(dirname $@)"
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS_CXX) -c $< -o $@
+	@mkdir -p "$$(dirname $@)"
+	@$(CXX) $(CXXFLAGS) $(CPPFLAGS_CXX) -c $< -o $@
+	@echo "  CXX\t$@"
 
 # Compilation rules for *.S files.
 obj-$(ARCH)/%.S.o: src/%.S GNUmakefile
-	mkdir -p "$$(dirname $@)"
-	$(CC) $(CFLAGS) $(CPPFLAGS_C) -c $< -o $@
+	@mkdir -p "$$(dirname $@)"
+	@$(CC) $(CFLAGS) $(CPPFLAGS_C) -c $< -o $@
+	@echo "  AS\t$@"
 
 ifeq ($(ARCH),x86_64)
 # Compilation rules for *.asm (nasm) files.
 obj-$(ARCH)/%.asm.o: src/%.asm GNUmakefile
-	mkdir -p "$$(dirname $@)"
-	nasm $(NASMFLAGS) $< -o $@
+	@mkdir -p "$$(dirname $@)"
+	@nasm $(NASMFLAGS) $< -o $@
+	@echo " NASM\t$@"
 endif
 
 # Remove object files and the final executable.
 .PHONY: clean
 clean:
-	rm -rf bin-$(ARCH) obj-$(ARCH)
+	@rm -rf bin-$(ARCH) obj-$(ARCH)
 
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean:
-	rm -rf bin-* obj-* freestnd-c-hdrs freestnd-cxx-hdrs src/cc-runtime src/limine.h
+	@rm -rf bin-* obj-* freestnd-c-hdrs freestnd-cxx-hdrs src/cc-runtime src/limine.h
 
 # Install the final built executable to its final on-root location.
 .PHONY: install

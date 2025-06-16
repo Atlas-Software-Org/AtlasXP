@@ -31,8 +31,8 @@ char error_codes[32][128] = {
 };
 
 void KiExceptionHandler(int exception) {
-    if (exception == 0) {
-        printk("\x1b[1;91m{ PANIC }\tIDT Exception occured during execution...\n\r\t\t%s\n\r", error_codes[exception]);
+    /*if (exception == 0) {
+        printk("\x1b[1;91m{ PANIC }\tIDT Exception occured during execution...\n\r\t\t%s\n\r Resolving error...", error_codes[exception]);
         asm volatile (
             ".intel_syntax noprefix\n\t"
             "mov rax, 0\n\t"
@@ -40,12 +40,12 @@ void KiExceptionHandler(int exception) {
             ".att_syntax prefix"
         );
         return;
-    }
+    }*/
 
     if (0 <= exception && exception < 32)
         printk("\x1b[1;91m{ PANIC }\tIDT Exception occured during execution...\n\r\t\t%s\n\r", error_codes[exception]);
     else
-        return;
+        printk("\x1b[1;91m{ PANIC }\tIDT Exception occured during execution...\n\r\t\tUnknown exception\n\r");
     __asm__ volatile ("cli; hlt"); // Completely hangs the computer
     while (1);
 }
@@ -60,18 +60,6 @@ void KiIdtSetDesc(uint8_t vector, void* isr, uint8_t flags) {
     descriptor->isr_mid        = ((uint64_t)isr >> 16) & 0xFFFF;
     descriptor->isr_high       = ((uint64_t)isr >> 32) & 0xFFFFFFFF;
     descriptor->reserved       = 0;
-
-    printk("\x1B[92m{ LOG }\tCreated IDT descriptor:\n\r"
-        "34: idt_entry_t* descriptor = &idt[0x%x];\n\r"
-        "36: descriptor->isr_low = (uint64_t)0x%p & 0xFFFF;\n\r"
-        "37: descriptor->kernel_cs = 0x%x; /* 0x08 */\n\r"
-        "38: descriptor->ist = 0;\n\r"
-        "39: descriptor->attributes = 0x%x;\n\r"
-        "40: descriptor->isr_mid = ((uint64_t)0x%p >> 16) & 0xFFFF;\n\r"
-        "41: descriptor->isr_high = ((uint64_t)0x%p >> 32) & 0xFFFFFFFF;\n\r"
-        "42: descriptor->reserved = 0;\n\r\x1B[0m",
-        vector, isr, GDT_OFFSET_KERNEL_CODE, flags, isr, isr
-    );
 }
 
 static bool vectors[IDT_MAX_DESCRIPTORS];
@@ -86,6 +74,7 @@ void KiInitExceptions() {
 }
 
 __attribute__((interrupt)) void KiKeyboardHandler(int* __unused) {
+    (void)__unused;
     uint8_t sc = inb(0x60);
     KeyboardDriverMain(sc);
     KiPicSendEoi(1);
@@ -95,6 +84,7 @@ __attribute__((interrupt)) void KiKeyboardHandler(int* __unused) {
 void KeyboardFlushBuffer() {
     while (inb(0x64) & 1) {
         volatile uint8_t discard = inb(0x60);
+        (void)discard;
     }
 }
 
@@ -108,8 +98,6 @@ idtr_t KiIdtInit() {
 
     KiIdtSetDesc(0x21, (void*)&KiKeyboardHandler, 0x8E);
 
-    printk("{ LOG }\tDBG: Keyboard handler address: %lx\n\r", (void*)&KiKeyboardHandler);
-
     outb(PIC1_DATA, 0b11111101);
     outb(PIC2_DATA, 0b11111111);
     KiIrqClearMask(1);
@@ -117,8 +105,6 @@ idtr_t KiIdtInit() {
     asm volatile ("cli");
 
     __asm__ volatile ("lidt %0" : : "m"(idtr));
-
-    printk("{ LOG }\tLoaded IDT...\n\r");
 
     asm volatile ("sti");
 

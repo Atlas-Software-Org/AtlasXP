@@ -11,7 +11,7 @@
 #define KISIMPLE_H 1
 
 #include <flanterm/flanterm.h>
-#include <flanterm/backends/fb.h>
+#include <flanterm/flanterm_backends/fb.h>
 #include <printk/printk.h>
 
 void outb(uint16_t port, uint8_t byte);

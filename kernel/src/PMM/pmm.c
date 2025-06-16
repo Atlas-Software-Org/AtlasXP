@@ -24,6 +24,7 @@ static PmmManager pmm;
    bitmap_mem points to preallocated memory for the bitmap
 */
 int KiPmmInit(uint64_t total_mem_bytes, uint32_t page_size, uint8_t *bitmap_mem, size_t bitmap_mem_size, size_t endKernelAligned_) {
+    (void)endKernelAligned_;
     pmm.total_pages = total_mem_bytes / page_size;
     pmm.free_pages = pmm.total_pages;
     pmm.bitmap_size_bytes = (pmm.total_pages + 7) / 8;

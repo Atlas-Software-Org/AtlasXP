@@ -16,9 +16,6 @@
 
 #include <Drivers/PS2Keyboard.h>
 
-__attribute__((noreturn))
-void KiExceptionHandler(int exception);
-
 #define IDT_MAX_DESCRIPTORS 256
 #define GDT_OFFSET_KERNEL_CODE 0x08
 
