@@ -1,12 +1,3 @@
-/*
-    Author: Adam Bassem
-    Revision 0
-    Patch 1
-    Minor 0
-    Major 0
-    Atlas 0.0.7
-*/
-
 #include <KiSimple.h>
 #include <PMM/pmm.h>
 #include <IDT/idt.h>
@@ -17,6 +8,7 @@ char kbd_drvr_buf[KBD_BUF_SIZE];
 volatile uint16_t kbd_buf_head = 0;
 volatile uint16_t kbd_buf_tail = 0;
 bool buffering_read = false;
+int cursor_read = 0;
 
 volatile int kbd_scrolled_up = 0;
 volatile int kbd_scrolled_down = 0;
@@ -27,6 +19,8 @@ int KiReadHidC() {
     char c = kbd_drvr_buf[kbd_buf_tail];
     kbd_buf_tail = (kbd_buf_tail + 1) % KBD_BUF_SIZE;
     buffering_read = false;
+    cursor_read++;
+    printk("%c", c);
     return c;
 }
 
@@ -60,45 +54,23 @@ void InitKeyboardDriver() {
 }
 
 static void KbdPushback(char c) {
-    uint16_t next = (kbd_buf_head + 1) % KBD_BUF_SIZE;
-    if (next != kbd_buf_tail) {
-        kbd_drvr_buf[kbd_buf_head] = c;
-        kbd_buf_head = next;
-        printk("%c", c);
-    } else {
-        OverflowKbdBfr();
-        KbdPushback(c);
-    }
-}
-
-static void KbdNAFPushback(char c) {
+	if (c == '\b') {
+		if (cursor_read == 0) return;
+	}
     uint16_t next = (kbd_buf_head + 1) % KBD_BUF_SIZE;
     if (next != kbd_buf_tail) {
         kbd_drvr_buf[kbd_buf_head] = c;
         kbd_buf_head = next;
     } else {
         OverflowKbdBfr();
-        KbdNAFPushback(c);
     }
 }
-
-uint8_t __global_keyboard_autoflush = 0; // 0 = autoflush enabled, 1 = disabled
 
 static uint8_t shift = 0;
 static uint8_t caps = 0;
 
 void KbdFlushCheck(char chr) {
-    if (__global_keyboard_autoflush == 0) {
-        if (chr == '\b') {
-            KbdPushback(0);
-        }
-        KbdPushback(chr);
-    } else {
-        if (chr == '\b') {
-            KbdNAFPushback(0);
-        }
-        KbdNAFPushback(chr);
-    }
+	KbdPushback(chr);
 }
 
 char USLayoutNrml[128] = {
@@ -146,16 +118,11 @@ void KeyboardDriverMain(uint8_t scancode) {
             return;
         }
 
-        int old_autoflush = __global_keyboard_autoflush;
-        __global_keyboard_autoflush = 1;
-
         if (buffering_read == true) {
-            __global_keyboard_autoflush = old_autoflush;
             extended = false;
             return;
         }
 
-        __global_keyboard_autoflush = old_autoflush;
         extended = false;
         return;
     }

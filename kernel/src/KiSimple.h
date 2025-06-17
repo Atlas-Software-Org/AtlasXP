@@ -1,12 +1,3 @@
-/*
-    Author: Adam Bassem
-    Revision 0
-    Patch 0
-    Minor 0
-    Major 0
-    Atlas 0.0.7
-*/
-
 #ifndef KISIMPLE_H
 #define KISIMPLE_H 1
 
@@ -28,5 +19,7 @@ void *memcpy(void *restrict dest, const void *restrict src, size_t n);
 void *memset(void *s, int c, size_t n);
 void *memmove(void *dest, const void *src, size_t n);
 int memcmp(const void *s1, const void *s2, size_t n);
+
+void KiPanic(const char* __restrict string, int _halt);
 
 #endif /* KISIMPLE_H */

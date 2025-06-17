@@ -1,12 +1,3 @@
-/*
-    Author: Adam Bassem
-    Revision 0
-    Patch 0
-    Minor 0
-    Major 0
-    Atlas 0.0.7
-*/
-
 #ifndef GDT_H
 #define GDT_H 1
 

@@ -1,12 +1,3 @@
-/*
-    Author: Adam Bassem
-    Revision 0
-    Patch 0
-    Minor 0
-    Major 0
-    Atlas 0.0.7
-*/
-
 #include "idt.h"
 
 typedef struct {
@@ -88,6 +79,8 @@ void KeyboardFlushBuffer() {
     }
 }
 
+#include <Syscalls/syscalls.h>
+
 idtr_t KiIdtInit() {
     idtr.base = (uintptr_t)&idt[0];
     idtr.limit = (uint16_t)(sizeof(idt_entry_t) * IDT_MAX_DESCRIPTORS - 1);
@@ -97,6 +90,7 @@ idtr_t KiIdtInit() {
     KiPicRemap(0x20, 0x28);
 
     KiIdtSetDesc(0x21, (void*)&KiKeyboardHandler, 0x8E);
+    KiIdtSetDesc(0x80, (void*)&KiSyscallHandler, 0x8E);
 
     outb(PIC1_DATA, 0b11111101);
     outb(PIC2_DATA, 0b11111111);

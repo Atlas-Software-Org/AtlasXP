@@ -1,7 +1,3 @@
-/*
-        No Author - main.c
-*/
-
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -17,10 +13,9 @@
 #include <VMM/vmm.h>
 
 #include <Drivers/PS2Keyboard.h>
+#include <Syscalls/syscalls.h>
 
 #include <ELF/elf.h>
-
-#include <elftest.h>
 
 __attribute__((used, section(".limine_requests")))
 static volatile LIMINE_BASE_REVISION(3);
@@ -98,7 +93,7 @@ void KiStartupInit(void) {
      *          -> Load FT CTX (flanterm)                               [DONE]
      *          -> Load GDT                                             [DONE]
      *          -> Load IDT                                             [DONE]
-     *          -> Prepare memory manager                               [PMM ONLY/DONE]
+     *          -> Prepare memory manager                               [DONE]
      *          -> Map userspace memory
      *          -> Prepare drivers
      *          -> Find a valid userspace with valid 'AtlasSM' OEM
@@ -127,7 +122,9 @@ void KiStartupInit(void) {
 
     printk("\e[2J\e[H");
 
-    LoadKernelElf(elftestelf);    
+	char buf[8192];
+	KiReadHidSN(buf, 8192);
+	printk("Read:\n%s\n", buf);
 
     hcf();
 }

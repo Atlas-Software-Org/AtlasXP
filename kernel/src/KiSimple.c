@@ -1,12 +1,3 @@
-/*
-    Author: Adam Bassem
-    Revision 0
-    Patch 0
-    Minor 0
-    Major 0
-    Atlas 0.0.7
-*/
-
 #include <KiSimple.h>
 #include <stdint.h>
 
@@ -101,4 +92,15 @@ int memcmp(const void *s1, const void *s2, size_t n) {
     }
 
     return 0;
+}
+
+static void halt_catch_fire_x86() {
+    while (1) {asm volatile ("hlt");}
+}
+
+void KiPanic(const char* __restrict string, int _halt) {
+    printk("\x1b[1;91m{ PANIC }\t%s", string);
+    printk("\n");
+    if (_halt) halt_catch_fire_x86();
+    else return;
 }

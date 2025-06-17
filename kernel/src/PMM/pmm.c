@@ -1,17 +1,9 @@
-/*
-    Author: Adam Bassem
-    Revision 0
-    Patch 0
-    Minor 0
-    Major 0
-    Atlas 0.0.7
-*/
-
-#include <stdint.h>
-#include <stddef.h>
+#include "pmm.h"
+#include <ELF/elf.h>
 
 typedef struct {
     uint8_t *bitmap;
+    int pidTrace[0x1000];
     size_t bitmap_size_bytes;
     size_t total_pages;
     size_t free_pages;
@@ -36,6 +28,11 @@ int KiPmmInit(uint64_t total_mem_bytes, uint32_t page_size, uint8_t *bitmap_mem,
     for (size_t i = 0; i < pmm.bitmap_size_bytes; i++) {
         pmm.bitmap[i] = 0;
     }
+
+    for (int i = 0; i < 0x1000; i++) {
+        pmm.pidTrace[i] = 0;
+    }
+
     return 0;
 }
 
@@ -56,6 +53,7 @@ void* KiPmmAlloc() {
         if (!PmmTestBit(pmm.bitmap, i)) {
             PmmSetBit(pmm.bitmap, i);
             pmm.free_pages--;
+            pmm.pidTrace[i] = CurrentPid;
             return (void*)(pmm.endKernelAligned_ + (i * 0x1000));
         }
     }
@@ -84,6 +82,7 @@ void KiPmmFree(void* frame_ptr) {
     if (PmmTestBit(pmm.bitmap, frame)) {
         PmmClearBit(pmm.bitmap, frame);
         pmm.free_pages++;
+        pmm.pidTrace[frame] = 0;
     }
 }
 
@@ -99,4 +98,22 @@ size_t KiPmmGetTotalPages() {
 
 size_t KiPmmGetFreePages() {
     return pmm.free_pages;
+}
+
+static void KiPmmFreeFrame(int frame) {
+    if (frame >= pmm.total_pages) return;
+
+    if (PmmTestBit(pmm.bitmap, frame)) {
+        PmmClearBit(pmm.bitmap, frame);
+        pmm.free_pages++;
+        pmm.pidTrace[frame] = 0;
+    }
+}
+
+void KiPmmClearPidTracedResources(int pid) {
+    for (size_t i = 0; i < pmm.total_pages; i++) {
+        if (pmm.pidTrace[i] == pid) {
+            KiPmmFreeFrame(i);
+        }
+    }
 }

@@ -5,7 +5,11 @@
 #include <KiSimple.h>
 #include <VMM/vmm.h>
 #include <stdint.h>
+#include <stddef.h>
 
-void LoadKernelElf(void* elf_data);
+extern int CurrentPid;
+
+void LoadKernelElf(void* elf_data, int argc, char** argv, char** envp);
+void UnloadKernelElf();
 
 #endif /* ELF_H */

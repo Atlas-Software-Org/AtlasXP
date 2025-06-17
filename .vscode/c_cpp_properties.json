@@ -1,17 +1,17 @@
 {
     "configurations": [
         {
-            "name": "Linux",
+            "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/kernel/freestnd-c-hdrs/x86_64/include/*",
-                "${workspaceFolder}/kernel/freestnd-cxx-hdrs/x86_64/include/*",
+                "${workspaceFolder}/kernel/freestnd-c-hdrs/x86_64/include",
+                "${workspaceFolder}/kernel/freestnd-cxx-hdrs/x86_64/include",
                 "${workspaceFolder}/kernel/src"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/clang",
+            "compilerPath": "C:/MinGW/bin/gcc.exe",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "linux-clang-x64"
+            "intelliSenseMode": "windows-gcc-x64"
         }
     ],
     "version": 4
