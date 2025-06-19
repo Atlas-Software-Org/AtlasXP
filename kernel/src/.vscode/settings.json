@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "cstddef": "cpp",
+        "cstdint": "cpp",
+        "paging.h": "c",
+        "ps2keyboard.h": "c"
+    }
+}
