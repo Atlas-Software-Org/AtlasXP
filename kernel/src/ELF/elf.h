@@ -11,5 +11,6 @@ extern int CurrentPid;
 
 void LoadKernelElf(void* elf_data, int argc, char** argv, char** envp);
 void UnloadKernelElf();
+void LoadUserElf(void* elf_data, int argc, char** argv, char** envp);
 
 #endif /* ELF_H */

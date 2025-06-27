@@ -45,3 +45,4 @@ AtlasXP 0.0.8	-	17/6/2025
 - Added simple PCI
 - Simple Syscall API
 - Patched over-backspace bug in the keyboard driver (first patch)
+- Renamed to ASNU (AtlasSuper is not Unix) - The name will be offically adopted in the next version...

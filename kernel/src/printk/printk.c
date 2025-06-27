@@ -145,15 +145,22 @@ static inline void _out_null(char character, void* buffer, size_t idx, size_t ma
 }
 
 
+extern int ConfigE9Enable;
+
 // internal _putchar wrapper
 static inline void _out_char(char character, void* buffer, size_t idx, size_t maxlen)
 {
   (void)buffer; (void)idx; (void)maxlen;
   if (character) {
-    char _s[2];
-    _s[0] = character;
-    _s[1] = 0;
-    flanterm_write(GetGlobalFtCtx(), _s, 1);
+    if (!ConfigE9Enable) {
+      char _s[2];
+      _s[0] = character;
+      _s[1] = 0;
+      flanterm_write(GetGlobalFtCtx(), _s, 1);
+    } else {
+      extern void outb(uint16_t, uint8_t);
+      outb(0xE9, character);
+    }
   }
 }
 

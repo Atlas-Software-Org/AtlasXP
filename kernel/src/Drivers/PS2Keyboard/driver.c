@@ -10,9 +10,6 @@ volatile uint16_t kbd_buf_tail = 0;
 bool buffering_read = false;
 int cursor_read = 0;
 
-volatile int kbd_scrolled_up = 0;
-volatile int kbd_scrolled_down = 0;
-
 int KiReadHidC() {
     buffering_read = true;
     while (kbd_buf_head == kbd_buf_tail);
@@ -25,16 +22,27 @@ int KiReadHidC() {
 }
 
 int KiReadHidSN(char *out, int maxlen) {
-	printk("\x1b[?25h");
+    printk("\x1b[?25h");
+    for (int i = 0; i < maxlen; i++) {
+    	out[i] = 0;
+    }
     int read = 0;
     while (read < maxlen - 1) {
         char c = KiReadHidC();
         if (c == '\n' || c == '\0')
             break;
-        out[read++] = c;
+        if (c == '\b') {
+        	read--;
+        	out[read] = 0;
+        	continue;
+        }
+        out[read] = c;
+        read++;
     }
-    out[read] = '\0';
-	printk("\x1b[?25l");
+    int tmprd = 0;
+	for (int i = 0; out[i] != 0; i++) tmprd++;
+	if (tmprd != read) read = tmprd;
+    printk("\x1b[?25l");
     return read;
 }
 

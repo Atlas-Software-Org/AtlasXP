@@ -11,13 +11,17 @@
 #include <IDT/idt.h>
 #include <PMM/pmm.h>
 #include <VMM/vmm.h>
+#include <ACPI/acpi.h>
 
+#include <Drivers/PIT.h>
 #include <Drivers/PS2Keyboard.h>
-#include <Drivers/ATA.h>
+#include <Drivers/AHCI.h>
 
 #include <Syscalls/syscalls.h>
 
 #include <ELF/elf.h>
+
+#include <BIN/nutshell.h>
 
 __attribute__((used, section(".limine_requests")))
 static volatile LIMINE_BASE_REVISION(3);
@@ -35,6 +39,11 @@ static volatile struct limine_hhdm_request hhdm_request = {
 __attribute__((used, section(".limine_requests")))
 static volatile struct limine_memmap_request memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST,
+    .revision = 0
+};
+__attribute__((used, section(".limine_requests")))
+static volatile struct limine_rsdp_request rsdp_request = {
+    .id = LIMINE_RSDP_REQUEST,
     .revision = 0
 };
 
@@ -55,6 +64,23 @@ static void hcf(void) {
 #endif
     }
 }
+
+uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
+uint64_t HhdmOffset;
+
+const char *MemMapEntryTypes[] = {
+    "LIMINE_MEMMAP_USABLE                ",
+    "LIMINE_MEMMAP_RESERVED              ",
+    "LIMINE_MEMMAP_ACPI_RECLAIMABLE      ",
+    "LIMINE_MEMMAP_ACPI_NVS              ",
+    "LIMINE_MEMMAP_BAD_MEMORY            ",
+    "LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE",
+    "LIMINE_MEMMAP_KERNEL_AND_MODULES    ",
+    "LIMINE_MEMMAP_FRAMEBUFFER           "
+};
+
+#define __CONFIG_SERIAL_E9_ENABLE 1
+#define __CONFIG_LOG_DETECTED_MEMORY_MAP 1
 
 void KiStartupInit(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
@@ -88,51 +114,96 @@ void KiStartupInit(void) {
         0
     );
 
-    SetGlobalFtCtx(ft_ctx);
+    SetGlobalFtCtx(ft_ctx, __CONFIG_SERIAL_E9_ENABLE);
 
-    /*
-     *      Steps of loading AtlasOS
-     *          -> Load FT CTX (flanterm)                               [DONE]
-     *          -> Load GDT                                             [DONE]
-     *          -> Load IDT                                             [DONE]
-     *          -> Prepare memory manager                               [DONE]
-     *          -> Map userspace memory
-     *          -> Prepare drivers
-     *          -> Find a valid userspace with valid 'AtlasSM' OEM
-     *          -> Load the userspace
-     *          -> Enter usermode
-     *          -> Execute the userspace
-     *          -> Prepare simple shell... (If the steps above (related to the userspace) are skiped)
-     */
+	uint64_t max_size = 0;
+	uint64_t max_base = 0;
 
-    extern char a_endKernel[];
-    extern char a_endKernelA[];
-    uint64_t endKernel = (uint64_t)&a_endKernel;
-    uint64_t endKernelAligned = (uint64_t)&a_endKernelA;
+	for (uint64_t i = 0; i < memmap_request.response->entry_count; i++) {
+	    struct limine_memmap_entry *entry = memmap_request.response->entries[i];
+
+	    if (entry->type == LIMINE_MEMMAP_USABLE) {
+	        if (entry->length > max_size) {
+	            max_size = entry->length;
+	            max_base = entry->base;
+	            printk("Found largest segment:\n\rSize: %0llX\n\rBase: %0llX\n\r", max_size, max_base);
+	        }
+
+	        printk("%2llu: %s - %p - %p", i, MemMapEntryTypes[entry->type],
+	               (void*)entry->base, (void*)entry->length);
+
+	        printk("  ***\n\r");
+	    }
+	}
+
+	if (max_size == 0)
+	    KiPanic("No usable memory found in Limine map", 1);
+
+	uint64_t total_pages = max_size / 0x1000;
+	uint64_t bitmap_size = (total_pages + 7) / 8;
+	bitmap_size = (bitmap_size + 0xFFF) & ~0xFFF; // align to 0x1000
+
+	uint8_t* bitmap_base = (uint8_t*)(uintptr_t)max_base;
+	uint64_t usable_base_after_bitmap = max_base + bitmap_size;
+	uint64_t usable_size_after_bitmap = max_size - bitmap_size;
+
+	int result = KiPmmInit(
+		max_base, max_size, bitmap_base
+	);
+
+	if (result != 0)
+	    KiPanic("KiPmmInit failed", 1);
+
+	PitInit(1000);
 
     KiGdtInit();
     idtr_t idtr = KiIdtInit();
     (void)idtr;
 
-    uint8_t bitmap_mem[(0x16636F60 / 0x1000 + 7) / 8];  /* preallocated bitmap */
+	/*
 
-    int pmm_status = KiPmmInit(0x16636F60, 0x1000, bitmap_mem, sizeof(bitmap_mem), endKernelAligned);
-    if (pmm_status != 0) {
-        printk("{ LOG }\tFailed to initialize PMM, error code %d / 0x%x\n", pmm_status, pmm_status);
-        hcf();
+	printk("Searching for AHCI controller (SATA)\n\r");
+    
+    uint8_t bus, dev, func;
+    if (!PciFindDeviceByClass(0x01, 0x06, 0x01, &bus, &dev, &func))
+        return;
+
+    uint32_t AhciBAR5 = PciGetBar(bus, dev, func, 5);
+    AhciBAR5 &= ~0xF;
+    KiMMap((void*)AhciBAR5, (void*)AhciBAR5, MMAP_PRESENT | MMAP_RW);
+
+    volatile uint32_t* abar = (volatile uint32_t*)AhciBAR5;
+    uint32_t cap = abar[0]; // AHCI CAP register
+
+    if (cap == 0) {
+        KiPanic(1, "AHCI dead...");
     }
 
-	for (int i = 0x400000; i < 0x500000; i++) {
-		KiMMap(i, i, MMAP_USER | MMAP_PRESENT | MMAP_RW);
-	}
+    AhciSendZeroRead(abar);
+
+    printk("Initialized AHCI...\n\r[ PCI ] BAR5 is 0x%08X\n\r", AhciBAR5);
+
+	*/
+
+	FB_WIDTH = framebuffer->width;
+	FB_HEIGHT = framebuffer->height;
+	FB_FLANTERM_CHAR_WIDTH = 1;
+	FB_FLANTERM_CHAR_HEIGHT = 1;
 
     printk("\e[2J\e[H");
-
-	printk("Starting nutshell...\n");
-
-    #include <BIN/nutshell.h>
 
     LoadKernelElf(nutshell, 0, 0, 0);
 
     hcf();
+}
+
+void _kernel_idle_process() {
+	printk("\e[2J\e[H");
+	printk("Entered IDLE mode...\n\r\n\r");
+	printk("To restart nutshell press any key...\n\r\n\r");
+	printk("-\tYou may change the power state of the system as there is no process executing at the moment\n\r");
+
+	KiReadHidC();
+
+	LoadKernelElf(nutshell, 0, 0, 0);
 }

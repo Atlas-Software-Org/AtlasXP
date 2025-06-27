@@ -63,11 +63,11 @@ int read(int fd, void* buf, int count) {
 	return (int)DispatchSyscall_3(3, (uint64_t)fd, (uint64_t)buf, (uint64_t)count);
 }
 
-int getpid() {
+int axp_api_getpid() {
 	return (int)DispatchSyscall_0(6);
 }
 
-void exit(int code) {
+void axp_api_exit(int code) {
 	DispatchSyscall_1(15, (uint64_t)code);
 }
 
@@ -84,10 +84,18 @@ void umap(void* virt) {
 	DispatchSyscall_1(18, (uint64_t)virt);
 }
 
-void* alloc() {
+void* memalloc() {
 	return (void*)DispatchSyscall_0(19);
 }
 
-void free(void* ptr) {
+void memfree(void* ptr) {
 	DispatchSyscall_1(20, (uint64_t)ptr);
+}
+
+uint64_t api_get_term_width() {
+	return DispatchSyscall_0(28);
+}
+
+uint64_t api_get_term_height() {
+	return DispatchSyscall_0(29);
 }

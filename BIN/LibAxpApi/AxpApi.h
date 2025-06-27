@@ -5,11 +5,13 @@
 
 int write(int fd, void* buf, int count);
 int read(int fd, void* buf, int count);
-int getpid();
-void exit(int code);
+int axp_api_getpid();
+void axp_api_exit(int code);
 void mmap(void* virt, void* phys, uint64_t attr);
 void umap(void* virt);
-void* alloc();
-void free(void* ptr);
+void* memalloc();
+void memfree(void* ptr);
+uint64_t api_get_term_width();
+uint64_t api_get_term_height();
 
 #endif /* AXPAPI_H */

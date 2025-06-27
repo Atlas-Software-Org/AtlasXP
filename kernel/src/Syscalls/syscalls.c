@@ -1,5 +1,7 @@
 #include "syscalls.h"
 
+extern uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
+
 typedef struct {
     uint64_t rax;
     uint64_t rbx;
@@ -71,48 +73,53 @@ extern int CurrentPid;
 
 void do_exit(uint64_t exit_code, int pid);
 
-__attribute__((interrupt)) void KiSyscallHandler(int *__unused) {
+static void SyscallResetIF() {
+	asm volatile ("sti");
+}
+
+void SyscallHandler(int *__unused) {
     (void)__unused;
 
-    x86SysVRegState _Registers;
-    x86SysVRegState *Registers = &_Registers;
-    x86GetRegSysV(&_Registers);
+    x86SysVRegState Registers;
+    x86GetRegSysV(&Registers);
+    
+    SyscallResetIF();
 
-    switch (Registers->rax) {
+    switch (Registers.rax) {
         case AxpOpen:
         case AxpClose:
             break;
         case AxpWrite:
-            //if (Registers->rsi == 1 || Registers->rsi == 2) {
-                int len = Registers->r10;
+            //if (Registers.rsi == 1 || Registers.rsi == 2) {
+                int len = Registers.r10;
                 if (len <= 0) {
-                    Registers->rax = 0;
+                    Registers.rax = 0;
                     break;
                 }
 
-                char* string = (char*)(void*)Registers->rdx;
+                char* string = (char*)(void*)Registers.rdx;
 
                 for (int i = 0; i < len; i++) {
                     printk("%c", (int)string[i]);
                 }
 
-                Registers->rax = len;
+                Registers.rax = len;
             //} else {
-            //    Registers->rax = -1;
+            //    Registers.rax = -1;
             //}
             break;
         case AxpRead:
-            if (Registers->rsi == 0) {
-                char* out = (char*)(void*)Registers->rdx;
-                uint64_t count = Registers->r10;
-                Registers->rax = KiReadHidSN(out, count);
+            if (Registers.rsi == 0) {
+                char* out = (char*)(void*)Registers.rdx;
+                uint64_t count = Registers.r10;
+                Registers.rax = KiReadHidSN(out, count);
             }
             break;
         case AxpLseek:
         case AxpSeek:
             break;
         case AxpGetPid:
-            Registers->rax = CurrentPid;
+            Registers.rax = CurrentPid;
             break;
         case AxpExec:
         case AxpListDir:
@@ -123,13 +130,13 @@ __attribute__((interrupt)) void KiSyscallHandler(int *__unused) {
         case AxpRemoveFile:
         case AxpCreateFile:
         case AxpExit:
-            do_exit(Registers->rsi, CurrentPid);
+            do_exit(Registers.rsi, CurrentPid);
             break;
         case AxpSleep:
         case AxpMMap:
-            uint64_t virt = Registers->rsi;
-            uint64_t phys = Registers->rdx;
-            uint64_t attr = Registers->r10;
+            uint64_t virt = Registers.rsi;
+            uint64_t phys = Registers.rdx;
+            uint64_t attr = Registers.r10;
             attr |= MMAP_USER;
             attr |= MMAP_RW;
             attr |= MMAP_PRESENT;
@@ -151,13 +158,15 @@ __attribute__((interrupt)) void KiSyscallHandler(int *__unused) {
             KiMMap((void*)virt, (void*)phys, attr);
             break;
         case AxpMUmap:
-            KiUMap((void*)Registers->rsi);
+            KiUMap((void*)Registers.rsi);
             break;
         case AxpAlloc:
         	void* address_alloc = KiPmmAlloc();
-        	Registers->rax = (uint64_t)address_alloc;
+        	Registers.rax = (uint64_t)address_alloc;
+        	break;
         case AxpFree:
-        	KiPmmFree((void*)Registers->rsi);
+        	KiPmmFree((void*)Registers.rsi);
+        	break;
         case AxpRename:
         case AxpDup:
         case AxpCut:
@@ -166,20 +175,26 @@ __attribute__((interrupt)) void KiSyscallHandler(int *__unused) {
         case AxpGetDeviceHandle:
         case AxpPowerModeSet:
             break;
+        case AxpGetTermWidth:
+        	Registers.rax = FB_WIDTH/FB_FLANTERM_CHAR_WIDTH;
+        	break;
+        case AxpGetTermHeight:
+        	Registers.rax = FB_HEIGHT/FB_FLANTERM_CHAR_HEIGHT;
     }
 
-    x86SetRegSysV(&_Registers);
+    x86SetRegSysV(&Registers);
 }
 
 void do_exit(uint64_t exit_code, int pid) {
-    KiPmmClearPidTracedResources(pid);
+    //KiPmmClearPidTracedResources(pid);
 
     UnloadKernelElf();
 
     if (exit_code != 0) {
-        printk("\r[ Process quit with error code: %llu (0x%016X)]\n\r", exit_code, exit_code);
+        printk("\r[ Process %d quit with error code: %llu (0x%016X)]\n\r", CurrentPid, exit_code, exit_code);
     }
 
     extern void _kernel_idle_process();
     CurrentPid = 1;
+    _kernel_idle_process();
 }

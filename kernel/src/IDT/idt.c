@@ -15,29 +15,69 @@ static idt_entry_t idt[256]; // Create an array of IDT entries; aligned for perf
 
 static idtr_t idtr;
 
+const char* PageFaultErrorCodeStrings[] = {
+    "Present violation",          // Bit 0
+    "Write access",               // Bit 1
+    "User-mode access",           // Bit 2
+    "Reserved bit violation",     // Bit 3
+    "Instruction fetch",          // Bit 4
+    "Protection-key violation",   // Bit 5
+    [15] = "SGX access violation" // Bit 15 (skip unused indices)
+};
+
+static void PrintPageFaultError(uint64_t err) {
+    for (int bit = 0; bit < 64; bit++) {
+        if (err & (1ULL << bit) && bit < sizeof(PageFaultErrorCodeStrings) / sizeof(char*)) {
+            const char* msg = PageFaultErrorCodeStrings[bit];
+            if (msg)
+                printk("  - %s\n\r", msg);
+        }
+    }
+}
+
 char error_codes[32][128] = {
     "Division by 0", "Reserved1", "NMI Interrupt", "Breakpoint (INT3)", "Overflow (INTO)", "Bounds range exceeded (BOUND)", "Invalid opcode (UD2)",
     "Device not available (WAIT/FWAIT)", "Double fault", "Coprocessor segment overrun", "Invalid TSS", "Segment not present", "Stack-segment fault",
     "General protection fault (GPFault)", "Page fault", "Reserved2", "x87 FPU error", "Alignment check", "SIMD Floating-Point Exception", "Reserved3",
 };
 
-void KiExceptionHandler(int exception) {
-    /*if (exception == 0) {
-        printk("\x1b[1;91m{ PANIC }\tIDT Exception occured during execution...\n\r\t\t%s\n\r Resolving error...", error_codes[exception]);
-        asm volatile (
-            ".intel_syntax noprefix\n\t"
-            "mov rax, 0\n\t"
-            "mov rdx, 0xFFFFFFFFFFFFFFFF\n\t"
-            ".att_syntax prefix"
-        );
-        return;
-    }*/
+void KiExceptionHandler(int exception, uint64_t err_code) {
+    if (exception < 0 || exception > 31) {
+        printk("\x1b[1;91m{ PANIC }\tIDT Exception occurred\n\r\t\tUnknown exception (%d) - Assuming software interrupt\n\r\x1b[0m", exception);
+        asm volatile ("cli; hlt");
+        while (1);
+    }
 
-    if (0 <= exception && exception < 32)
-        printk("\x1b[1;91m{ PANIC }\tIDT Exception occured during execution...\n\r\t\t%s\n\r", error_codes[exception]);
-    else
-        printk("\x1b[1;91m{ PANIC }\tIDT Exception occured during execution...\n\r\t\tUnknown exception\n\r");
-    __asm__ volatile ("cli; hlt"); // Completely hangs the computer
+    printk("\x1b[1;91m{ PANIC }\tIDT Exception occurred\n\r\t\t%s\n\r\x1b[0m", error_codes[exception]);
+
+    if (exception == 14) {
+        printk("Exception is a #PAGEFAULT\n\r");
+
+		uint64_t CR2 = 0;
+        asm volatile (
+            ".intel_syntax noprefix;"
+            "mov %0, cr2;"
+            ".att_syntax prefix;"
+            : "=r"(CR2)
+            :
+            : "memory"
+        );
+
+		printk("CR2: 0x%016X\n\r", CR2);
+		
+        PrintPageFaultError(err_code);
+
+        if (CR2 == 0 || (CR2 >= 0x0000000000000000 && CR2 < 0x1000)) {
+            printk("CR2 is null or too low. Cannot recover.\n\rHalting...\n\r");
+        } else {
+            printk("Attempting to identity-map faulting address: %p\n\r", (void*)CR2);
+            KiMMap((void*)CR2, (void*)CR2, MMAP_PRESENT | MMAP_RW);
+            printk("Mapped. Returning to continue execution.\n\r");
+            return;
+        }
+    }
+
+    asm volatile ("cli; hlt");
     while (1);
 }
 
@@ -89,11 +129,13 @@ idtr_t KiIdtInit() {
 
     KiPicRemap(0x20, 0x28);
 
+    KiIdtSetDesc(0x20, (void*)&KiPitHandler, 0x8E);
     KiIdtSetDesc(0x21, (void*)&KiKeyboardHandler, 0x8E);
-    KiIdtSetDesc(0x80, (void*)&KiSyscallHandler, 0x8E);
+    KiIdtSetDesc(0x80, (void*)&KiSyscallHandler, 0xEF);
 
-    outb(PIC1_DATA, 0b11111101);
+    outb(PIC1_DATA, 0b11111100);
     outb(PIC2_DATA, 0b11111111);
+    KiIrqClearMask(0);
     KiIrqClearMask(1);
 
     asm volatile ("cli");

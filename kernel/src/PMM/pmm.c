@@ -1,119 +1,78 @@
 #include "pmm.h"
-#include <ELF/elf.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <VMM/vmm.h>
+
+#define PAGE_SIZE 0x1000
 
 typedef struct {
-    uint8_t *bitmap;
-    int pidTrace[0x1000];
-    size_t bitmap_size_bytes;
+    uint8_t* bitmap;
+    uintptr_t base;
     size_t total_pages;
     size_t free_pages;
-    size_t endKernelAligned_;
-} PmmManager;
+} Pmm;
 
-static PmmManager pmm;
+static Pmm pmm;
 
-/* Kernel-callable PMM initialization
-   bitmap_mem points to preallocated memory for the bitmap
-*/
-int KiPmmInit(uint64_t total_mem_bytes, uint32_t page_size, uint8_t *bitmap_mem, size_t bitmap_mem_size, size_t endKernelAligned_) {
-    (void)endKernelAligned_;
-    pmm.total_pages = total_mem_bytes / page_size;
-    pmm.free_pages = pmm.total_pages;
-    pmm.bitmap_size_bytes = (pmm.total_pages + 7) / 8;
+static inline void bitmap_set(size_t bit) {
+    pmm.bitmap[bit / 8] |= (1 << (bit % 8));
+}
 
-    if (bitmap_mem_size < pmm.bitmap_size_bytes) return -1;
+static inline void bitmap_clear(size_t bit) {
+    pmm.bitmap[bit / 8] &= ~(1 << (bit % 8));
+}
 
-    pmm.bitmap = bitmap_mem;
+static inline bool bitmap_test(size_t bit) {
+    return pmm.bitmap[bit / 8] & (1 << (bit % 8));
+}
 
-    for (size_t i = 0; i < pmm.bitmap_size_bytes; i++) {
+int KiPmmInit(uintptr_t memory_base, size_t memory_size, uintptr_t bitmap_virt) {
+    size_t page_count = memory_size / PAGE_SIZE;
+    size_t bitmap_size = (page_count + 7) / 8;
+
+    pmm.bitmap = (uint8_t*)bitmap_virt;
+    pmm.base = memory_base;
+    pmm.total_pages = page_count;
+    pmm.free_pages = page_count;
+
+    for (size_t i = 0; i < bitmap_size; i++) {
         pmm.bitmap[i] = 0;
     }
 
-    for (int i = 0; i < 0x1000; i++) {
-        pmm.pidTrace[i] = 0;
+    for (size_t i = 0; i < bitmap_size / PAGE_SIZE + 1; i++) {
+        uintptr_t addr = bitmap_virt + (i * PAGE_SIZE);
+        KiMMap((void*)addr, (void*)addr, MMAP_PRESENT | MMAP_RW | MMAP_PMM_RESERVED_MEMORY);
+    }
+
+    for (size_t i = 0; i < page_count; i++) {
+        uintptr_t addr = memory_base + (i * PAGE_SIZE);
+        KiMMap((void*)addr, (void*)addr, MMAP_PRESENT | MMAP_RW | MMAP_PMM_HEAP_MEMORY);
     }
 
     return 0;
 }
 
-static inline void PmmSetBit(uint8_t *bitmap, size_t bit) {
-    bitmap[bit / 8] |= (1 << (bit % 8));
-}
-
-static inline void PmmClearBit(uint8_t *bitmap, size_t bit) {
-    bitmap[bit / 8] &= ~(1 << (bit % 8));
-}
-
-static inline int PmmTestBit(uint8_t *bitmap, size_t bit) {
-    return (bitmap[bit / 8] >> (bit % 8)) & 1;
-}
-
 void* KiPmmAlloc() {
     for (size_t i = 0; i < pmm.total_pages; i++) {
-        if (!PmmTestBit(pmm.bitmap, i)) {
-            PmmSetBit(pmm.bitmap, i);
+        if (!bitmap_test(i)) {
+            bitmap_set(i);
             pmm.free_pages--;
-            pmm.pidTrace[i] = CurrentPid;
-            return (void*)(pmm.endKernelAligned_ + (i * 0x1000));
+            return (void*)(pmm.base + (i * PAGE_SIZE));
         }
     }
     return NULL;
 }
 
-void* KiPmmNAlloc(size_t count) {
-    void* initial = KiPmmAlloc();
-    if (initial == NULL) return NULL;
+void KiPmmFree(void* ptr) {
+    uintptr_t addr = (uintptr_t)ptr;
+    if (addr < pmm.base) return;
 
-    for (size_t i = 1; i < count; i++) {
-        void* test = KiPmmAlloc();
-        if (test == NULL) return NULL;
-    }
+    size_t index = (addr - pmm.base) / PAGE_SIZE;
+    if (index >= pmm.total_pages) return;
 
-    return initial;
-}
-
-void KiPmmFree(void* frame_ptr) {
-    uintptr_t addr = (uintptr_t)frame_ptr;
-    if (addr < pmm.endKernelAligned_) return;
-
-    size_t frame = (addr - pmm.endKernelAligned_) / 0x1000;
-    if (frame >= pmm.total_pages) return;
-
-    if (PmmTestBit(pmm.bitmap, frame)) {
-        PmmClearBit(pmm.bitmap, frame);
+    if (bitmap_test(index)) {
+        bitmap_clear(index);
         pmm.free_pages++;
-        pmm.pidTrace[frame] = 0;
-    }
-}
-
-void KiPmmNFree(void* frame_ptr, size_t count) {
-    for (size_t i = 0; i < count; i++) {
-        KiPmmFree((void*)((uintptr_t)frame_ptr + (i * 0x1000)));
-    }
-}
-
-size_t KiPmmGetTotalPages() {
-    return pmm.total_pages;
-}
-
-size_t KiPmmGetFreePages() {
-    return pmm.free_pages;
-}
-
-static void KiPmmFreeFrame(int frame) {
-    if (frame >= pmm.total_pages) return;
-
-    if (PmmTestBit(pmm.bitmap, frame)) {
-        PmmClearBit(pmm.bitmap, frame);
-        pmm.free_pages++;
-        pmm.pidTrace[frame] = 0;
-    }
-}
-
-void KiPmmClearPidTracedResources(int pid) {
-    for (size_t i = 0; i < pmm.total_pages; i++) {
-        if (pmm.pidTrace[i] == pid) {
-            KiPmmFreeFrame(i);
-        }
     }
 }

@@ -6,7 +6,7 @@ MAKEFLAGS += -rR
 ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 4G -debugcon stdio
+QEMUFLAGS := -m 8G -debugcon stdio
 
 override IMAGE_NAME := Atlas-0.0.8-$(ARCH)
 
@@ -40,9 +40,11 @@ run-x86_64: ovmf/ovmf-code-$(ARCH).fd $(IMAGE_NAME).iso
 .PHONY: run-hdd-x86_64
 run-hdd-x86_64: ovmf/ovmf-code-$(ARCH).fd $(IMAGE_NAME).hdd
 	@qemu-system-$(ARCH) \
-		-M pc \
+		-M q35 \
 		-drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-$(ARCH).fd,readonly=on \
-		-hda $(IMAGE_NAME).hdd \
+		-device ahci,id=ahci0 \
+		-drive id=disk,if=none,file=$(IMAGE_NAME).hdd,format=raw \
+		-device ide-hd,drive=disk,bus=ahci0.0 \
 		$(QEMUFLAGS)
 		
 .PHONY: run-aarch64
@@ -163,6 +165,7 @@ kernel-deps:
 
 .PHONY: kernel
 kernel: kernel-deps
+	$(MAKE) -C BIN
 	$(MAKE) -C kernel
 
 $(IMAGE_NAME).iso: limine/limine kernel

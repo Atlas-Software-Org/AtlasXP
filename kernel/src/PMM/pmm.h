@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-int KiPmmInit(uint64_t total_mem_bytes, uint32_t page_size, uint8_t *bitmap_mem, size_t bitmap_mem_size, size_t endKernelAligned_);
+int KiPmmInit(uintptr_t memory_base, size_t memory_size, uintptr_t bitmap_virt);
 void* KiPmmAlloc();
 void* KiPmmNAlloc(size_t count);
 void KiPmmFree(void* frame_ptr);

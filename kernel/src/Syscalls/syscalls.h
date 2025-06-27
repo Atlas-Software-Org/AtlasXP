@@ -36,7 +36,9 @@
 #define AxpSystemUptime 25
 #define AxpGetDeviceHandle 26
 #define AxpPowerModeSet 27
+#define AxpGetTermWidth 28
+#define AxpGetTermHeight 29
 
-__attribute__((interrupt)) void KiSyscallHandler(int *__unused);
+void KiSyscallHandler();
 
 #endif /* SYSCALLS_H */

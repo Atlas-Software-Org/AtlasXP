@@ -1,18 +1,24 @@
 %macro isr_err_stub 1
+global isr_stub_%+%1
 isr_stub_%+%1:
+    pop rsi          ; error code → rsi
     push rdi
-    mov rdi, %1
+    mov rdi, %1      ; exception number → rdi
     call KiExceptionHandler
     pop rdi
     iretq
 %endmacro
-; if writing for 64-bit, use iretq instead
+
 %macro isr_no_err_stub 1
+global isr_stub_%+%1
 isr_stub_%+%1:
+    push rsi
     push rdi
-    mov rdi, %1
+    xor rsi, rsi     ; no error code → rsi = 0
+    mov rdi, %1      ; exception number → rdi
     call KiExceptionHandler
     pop rdi
+    pop rsi
     iretq
 %endmacro
 
