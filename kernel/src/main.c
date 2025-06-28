@@ -1,7 +1,7 @@
+#include <limine.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <limine.h>
 
 #include <flanterm/flanterm.h>
 #include <flanterm/flanterm_backends/fb.h>
@@ -68,19 +68,7 @@ static void hcf(void) {
 uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
 uint64_t HhdmOffset;
 
-const char *MemMapEntryTypes[] = {
-    "LIMINE_MEMMAP_USABLE                ",
-    "LIMINE_MEMMAP_RESERVED              ",
-    "LIMINE_MEMMAP_ACPI_RECLAIMABLE      ",
-    "LIMINE_MEMMAP_ACPI_NVS              ",
-    "LIMINE_MEMMAP_BAD_MEMORY            ",
-    "LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE",
-    "LIMINE_MEMMAP_KERNEL_AND_MODULES    ",
-    "LIMINE_MEMMAP_FRAMEBUFFER           "
-};
-
-#define __CONFIG_SERIAL_E9_ENABLE 1
-#define __CONFIG_LOG_DETECTED_MEMORY_MAP 1
+#define __CONFIG_SERIAL_E9_ENABLE 0
 
 void KiStartupInit(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
@@ -116,74 +104,63 @@ void KiStartupInit(void) {
 
     SetGlobalFtCtx(ft_ctx, __CONFIG_SERIAL_E9_ENABLE);
 
-	uint64_t max_size = 0;
-	uint64_t max_base = 0;
-
-	for (uint64_t i = 0; i < memmap_request.response->entry_count; i++) {
-	    struct limine_memmap_entry *entry = memmap_request.response->entries[i];
-
-	    if (entry->type == LIMINE_MEMMAP_USABLE) {
-	        if (entry->length > max_size) {
-	            max_size = entry->length;
-	            max_base = entry->base;
-	            printk("Found largest segment:\n\rSize: %0llX\n\rBase: %0llX\n\r", max_size, max_base);
-	        }
-
-	        printk("%2llu: %s - %p - %p", i, MemMapEntryTypes[entry->type],
-	               (void*)entry->base, (void*)entry->length);
-
-	        printk("  ***\n\r");
-	    }
-	}
-
-	if (max_size == 0)
-	    KiPanic("No usable memory found in Limine map", 1);
-
-	uint64_t total_pages = max_size / 0x1000;
-	uint64_t bitmap_size = (total_pages + 7) / 8;
-	bitmap_size = (bitmap_size + 0xFFF) & ~0xFFF; // align to 0x1000
-
-	uint8_t* bitmap_base = (uint8_t*)(uintptr_t)max_base;
-	uint64_t usable_base_after_bitmap = max_base + bitmap_size;
-	uint64_t usable_size_after_bitmap = max_size - bitmap_size;
-
-	int result = KiPmmInit(
-		max_base, max_size, bitmap_base
-	);
-
-	if (result != 0)
-	    KiPanic("KiPmmInit failed", 1);
-
-	PitInit(1000);
-
     KiGdtInit();
     idtr_t idtr = KiIdtInit();
     (void)idtr;
 
-	/*
+	uint64_t RAMSize = 0;
+	
+	uint64_t RAMEntrySizes[memmap_request.response->entry_count];
+	uint64_t RAMEntryBase[memmap_request.response->entry_count];
+	size_t RAMEntrySizesPtr = 0;
+	
+	for (size_t i = 0; i < memmap_request.response->entry_count; i++) {
+		struct limine_memmap_entry* entry = memmap_request.response->entries[i];
+	
+		if (entry->type == LIMINE_MEMMAP_USABLE || entry->type == LIMINE_MEMMAP_FRAMEBUFFER) {
+			RAMSize += entry->length;
+	
+			if (entry->type != LIMINE_MEMMAP_FRAMEBUFFER) {
+				RAMEntrySizes[RAMEntrySizesPtr] = entry->length;
+				RAMEntryBase[RAMEntrySizesPtr] = entry->base;
+				RAMEntrySizesPtr++;
+			}
+		}
+	}
+	
+	printk("uint64_t RAMSize = 0x%llx;\n\r", RAMSize);
+	
+	for (size_t i = 0; i < RAMEntrySizesPtr; i++) {
+		printk("uint64_t RAMEntryCount[0x%llX] = 0x%llX;\n\r", i, RAMEntrySizes[i]);
+	}
+	
+	uint64_t RAMSizeQuotient = RAMSize / (1024ULL * 1024 * 1024);
+	uint64_t RAMSizeRemainder = RAMSize % (1024ULL * 1024 * 1024);
+	
+	if (RAMSizeRemainder >= (512ULL * 1024 * 1024)) {
+		RAMSizeQuotient += 1;
+	}
+	
+	printk("uint64_t RAMSizeRound = %llu;\n\r", RAMSizeQuotient);
+	
+	size_t LargestIndex = 0;
+	
+	for (size_t i = 1; i < RAMEntrySizesPtr; i++) {
+		if (RAMEntrySizes[i] > RAMEntrySizes[LargestIndex] &&
+			RAMEntryBase[i] < RAMSize - ((2ULL * 1024 * 1024 * 1024) - 4096)
+		) {
+			LargestIndex = i;
+		}
+	}
+	
+	printk("Largest index below the topmost 2GiB region is index: %llu\n\rSize: 0x%llX\n\rBase: 0x%llX\n\r",
+		LargestIndex, RAMEntrySizes[LargestIndex], RAMEntryBase[LargestIndex]);
 
-	printk("Searching for AHCI controller (SATA)\n\r");
-    
-    uint8_t bus, dev, func;
-    if (!PciFindDeviceByClass(0x01, 0x06, 0x01, &bus, &dev, &func))
-        return;
+	KiPmmInit(RAMEntryBase[LargestIndex], RAMEntrySizes[LargestIndex]);
 
-    uint32_t AhciBAR5 = PciGetBar(bus, dev, func, 5);
-    AhciBAR5 &= ~0xF;
-    KiMMap((void*)AhciBAR5, (void*)AhciBAR5, MMAP_PRESENT | MMAP_RW);
+	hcf();
 
-    volatile uint32_t* abar = (volatile uint32_t*)AhciBAR5;
-    uint32_t cap = abar[0]; // AHCI CAP register
-
-    if (cap == 0) {
-        KiPanic(1, "AHCI dead...");
-    }
-
-    AhciSendZeroRead(abar);
-
-    printk("Initialized AHCI...\n\r[ PCI ] BAR5 is 0x%08X\n\r", AhciBAR5);
-
-	*/
+	PitInit(1000);
 
 	FB_WIDTH = framebuffer->width;
 	FB_HEIGHT = framebuffer->height;
@@ -192,7 +169,7 @@ void KiStartupInit(void) {
 
     printk("\e[2J\e[H");
 
-    LoadKernelElf(nutshell, 0, 0, 0);
+    LoadKernelElf((void*)nutshell, 0, 0, 0);
 
     hcf();
 }

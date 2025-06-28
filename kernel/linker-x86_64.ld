@@ -34,7 +34,6 @@ SECTIONS
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .text : {
-    	text_start = .;
         *(.text .text.*)
     } :text
 
@@ -58,19 +57,15 @@ SECTIONS
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .data : {
-        *(.data .data.*)
-        end_data = .;
-    } :data
+        *(.data .data.*)    } :data
 
     /* NOTE: .bss needs to be the last thing mapped to :data, otherwise lots of */
     /* unnecessary zeros will be written to the binary. */
     /* If you need, for example, .init_array and .fini_array, those should be placed */
     /* above this. */
     .bss : {
-    	sbss = .;
         *(.bss .bss.*)
         *(COMMON)
-        ebss = .;
     } :data
 
     /* Discard .note.* and .eh_frame* since they may cause issues on some hosts. */
@@ -79,7 +74,6 @@ SECTIONS
         *(.note .note.*)
     }
 
-    a_endKernel = .;
-    a_endKernelA = ALIGN(4096);
+    endkernel_unaligned = .;
     endkernel = ALIGN(4096);
 }

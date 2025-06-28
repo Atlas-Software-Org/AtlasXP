@@ -1,10 +1,11 @@
 #ifndef PMM_H
 #define PMM_H 1
 
+#include <KiSimple.h>
 #include <stdint.h>
 #include <stddef.h>
 
-int KiPmmInit(uintptr_t memory_base, size_t memory_size, uintptr_t bitmap_virt);
+void KiPmmInit(uint64_t mem_base, uint64_t mem_size);
 void* KiPmmAlloc();
 void* KiPmmNAlloc(size_t count);
 void KiPmmFree(void* frame_ptr);

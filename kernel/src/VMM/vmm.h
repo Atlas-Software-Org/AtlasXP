@@ -38,4 +38,6 @@ extern uint64_t HhdmOffset;
 void KiMMap(void* virt_addr, void* phys_addr, uint64_t attributes);
 void KiUMap(void* virt_addr);
 
+int KiIsMapped(void* phys_addr);
+
 #endif /* VMM_H */

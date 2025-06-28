@@ -1,13 +1,14 @@
 #include "pmm.h"
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include <VMM/vmm.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 #define PAGE_SIZE 0x1000
 
 typedef struct {
     uint8_t* bitmap;
+    size_t bitmap_size;
     uintptr_t base;
     size_t total_pages;
     size_t free_pages;
@@ -15,45 +16,35 @@ typedef struct {
 
 static Pmm pmm;
 
-static inline void bitmap_set(size_t bit) {
-    pmm.bitmap[bit / 8] |= (1 << (bit % 8));
+int IsPmmEnabled = 0;
+
+static void bitmap_set(size_t bit) {
+    pmm.bitmap[bit >> 3] |= 1 << (bit & 7);
 }
 
-static inline void bitmap_clear(size_t bit) {
-    pmm.bitmap[bit / 8] &= ~(1 << (bit % 8));
+static void bitmap_clear(size_t bit) {
+    pmm.bitmap[bit >> 3] &= ~(1 << (bit & 7));
 }
 
-static inline bool bitmap_test(size_t bit) {
-    return pmm.bitmap[bit / 8] & (1 << (bit % 8));
+static bool bitmap_test(size_t bit) {
+    return pmm.bitmap[bit >> 3] & (1 << (bit & 7));
 }
 
-int KiPmmInit(uintptr_t memory_base, size_t memory_size, uintptr_t bitmap_virt) {
-    size_t page_count = memory_size / PAGE_SIZE;
-    size_t bitmap_size = (page_count + 7) / 8;
+void KiPmmInit(uint64_t mem_base, uint64_t mem_size) {
+	pmm.bitmap = mem_base + mem_size - (mem_size / 8);
+	pmm.bitmap_size = mem_size / 8;
+	pmm.base = mem_base;
+	pmm.total_pages = (mem_size - pmm.bitmap_size) / PAGE_SIZE;
+	pmm.free_pages = pmm.total_pages;
 
-    pmm.bitmap = (uint8_t*)bitmap_virt;
-    pmm.base = memory_base;
-    pmm.total_pages = page_count;
-    pmm.free_pages = page_count;
+	for (uint64_t i = mem_base; i < mem_base+mem_size; i+=0x1000) {
+		KiMMap((void*)mem_base, (void*)mem_base, MMAP_PRESENT | MMAP_RW | MMAP_PMM_HEAP_MEMORY);
+	}
 
-    for (size_t i = 0; i < bitmap_size; i++) {
-        pmm.bitmap[i] = 0;
-    }
-
-    for (size_t i = 0; i < bitmap_size / PAGE_SIZE + 1; i++) {
-        uintptr_t addr = bitmap_virt + (i * PAGE_SIZE);
-        KiMMap((void*)addr, (void*)addr, MMAP_PRESENT | MMAP_RW | MMAP_PMM_RESERVED_MEMORY);
-    }
-
-    for (size_t i = 0; i < page_count; i++) {
-        uintptr_t addr = memory_base + (i * PAGE_SIZE);
-        KiMMap((void*)addr, (void*)addr, MMAP_PRESENT | MMAP_RW | MMAP_PMM_HEAP_MEMORY);
-    }
-
-    return 0;
+	IsPmmEnabled = 1;
 }
 
-void* KiPmmAlloc() {
+void* KiPmmAlloc(void) {
     for (size_t i = 0; i < pmm.total_pages; i++) {
         if (!bitmap_test(i)) {
             bitmap_set(i);
