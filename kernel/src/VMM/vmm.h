@@ -15,29 +15,42 @@ typedef struct {
 #define PAGE_PSE         0x080
 #define PAGE_ADDR_MASK   0xFFFFFFFFF000ULL
 
-extern uint64_t HhdmOffset;
+extern uint64_t RamSize;
 
-#define PHYS_TO_VIRT(paddr) ((void*)(HhdmOffset + (paddr)))
-#define VIRT_TO_PHYS(vaddr) ((uint64_t)(vaddr) - HhdmOffset)
+#define PHYS_TO_VIRT(paddr) \
+    ((void *)((uint64_t)(paddr) - ((RamSize) - 0x80000000) + 0xFFFFFFFF80000000))
 
-#define MMAP_PRESENT    (1ULL << 0)
-#define MMAP_RW         (1ULL << 1)
-#define MMAP_USER       (1ULL << 2)
-#define MMAP_PWT        (1ULL << 3)
-#define MMAP_PCD        (1ULL << 4)
-#define MMAP_ACCESSED   (1ULL << 5)
-#define MMAP_DIRTY      (1ULL << 6)
-#define MMAP_HUGE       (1ULL << 7)
-#define MMAP_GLOBAL     (1ULL << 8)
-#define MMAP_PMM_RESERVED_MEMORY (1ULL << 9)
-#define MMAP_PMM_HEAP_MEMORY (1ULL << 10)
+#define VIRT_TO_PHYS(vaddr) \
+    ((uint64_t)(vaddr) - 0xFFFFFFFF80000000 + ((RamSize) - 0x80000000))
+
+// --- Basic access permissions ---
+#define MMAP_PRESENT    (1ULL << 0)   // Page is present
+#define MMAP_RW         (1ULL << 1)   // Read/write (1 = writeable)
+#define MMAP_USER       (1ULL << 2)   // User-accessible page
+
+// --- Caching ---
+#define MMAP_PWT        (1ULL << 3)   // Page Write-Through
+#define MMAP_PCD        (1ULL << 4)   // Page Cache Disable
+
+// --- Access tracking ---
+#define MMAP_ACCESSED   (1ULL << 5)   // Set by CPU when accessed
+#define MMAP_DIRTY      (1ULL << 6)   // Set by CPU when written (PTE only)
+
+// --- Page size ---
+#define MMAP_HUGE       (1ULL << 7)   // Set on PDE for 2MiB/1GiB pages
+
+// --- TLB behavior ---
+#define MMAP_GLOBAL     (1ULL << 8)   // Global mapping (not flushed on CR3 switch)
+
+// --- Software available bits ---
+#define MMAP_SOFT0      (1ULL << 9)
+#define MMAP_SOFT1      (1ULL << 10)
 #define MMAP_SOFT2      (1ULL << 11)
-/* --- Execute permissions (if NX supported) --- */
+
+// --- Execute permissions (if NX supported) ---
 #define MMAP_NX         (1ULL << 63)  // No-execute
 
 void KiMMap(void* virt_addr, void* phys_addr, uint64_t attributes);
 void KiUMap(void* virt_addr);
-
-int KiIsMapped(void* phys_addr);
 
 #endif /* VMM_H */

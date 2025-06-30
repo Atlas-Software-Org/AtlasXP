@@ -44,36 +44,48 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
-    /* C++ is a language that allows for global constructors. In order to obtain the */
-    /* address of the ".init_array" section we need to define a symbol for it. */
-    .init_array : {
-        __init_array = .;
-        KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
-        KEEP(*(.init_array .ctors))
-        __init_array_end = .;
-    } :rodata
-
     /* Move to the next memory page for .data */
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .data : {
-        *(.data .data.*)    } :data
+        *(.data .data.*)
+    } :data
 
     /* NOTE: .bss needs to be the last thing mapped to :data, otherwise lots of */
     /* unnecessary zeros will be written to the binary. */
     /* If you need, for example, .init_array and .fini_array, those should be placed */
     /* above this. */
-    .bss : {
-        *(.bss .bss.*)
-        *(COMMON)
-    } :data
+	.bss : ALIGN(0x1000) {
+	    *(.bss .bss.*);
+	    *(COMMON);
+
+	    . = ALIGN(0x400000);
+	    __bss_stack_start = .;
+	    . = . + 4M;
+	    __bss_stack_end = .;
+	} :data
+
+	VirtualEndKernel = ALIGN(0x1000);
 
     /* Discard .note.* and .eh_frame* since they may cause issues on some hosts. */
     /DISCARD/ : {
-        *(.eh_frame*)
+        *(.debug_info .debug_info*)
+        *(.debug_abbrev .debug_abbrev.*)
+        *(.debug_line .debug_line.*)
+        *(.debug_str .debug_str.*)
+        *(.debug_aranges .debug_aranges.*)
+        *(.debug_ranges .debug_ranges.*)
+        *(.debug_loc .debug_loc.*)
+        *(.debug_macinfo .debug_macinfo.*)
+        *(.debug_macro .debug_macro.*)
+        *(.debug_pubnames .debug_pubnames.*)
+        *(.debug_pubtypes .debug_pubtypes.*)
+        *(.debug_frame .debug_frame.*)
+        *(.eh_frame .eh_frame.*)
+        *(.debug_addr .debug_addr.*)
+        *(.debug_cu_index .debug_cu_index.*)
+        *(.debug_tu_index .debug_tu_index.*)
+        *(.gdb_index .gdb_index.*)
         *(.note .note.*)
     }
-
-    endkernel_unaligned = .;
-    endkernel = ALIGN(4096);
 }

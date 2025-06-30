@@ -67,6 +67,7 @@ static void hcf(void) {
 
 uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
 uint64_t HhdmOffset;
+uint64_t RamSize = 0;
 
 #define __CONFIG_SERIAL_E9_ENABLE 0
 
@@ -104,61 +105,27 @@ void KiStartupInit(void) {
 
     SetGlobalFtCtx(ft_ctx, __CONFIG_SERIAL_E9_ENABLE);
 
+	for (size_t i = 0; i < memmap_request.response->entry_count; i++) {
+		struct limine_memmap_entry* entry_at_i = memmap_request.response->entries[i];
+		if (entry_at_i->type == LIMINE_MEMMAP_USABLE)
+			RamSize += entry_at_i->length;
+		else
+			continue; /* idk but it's trust issues */
+	}
+
+	extern char __bss_stack_start[];
+	extern char __bss_stack_end[];
+	
+	void* stack_base = __bss_stack_start;
+	size_t stack_size = __bss_stack_end - __bss_stack_start;
+
+	KiPmmInit(stack_base, stack_size);
+	
+	printk("Init PMM with parameters:\n\rBASE: %llX\n\rSIZE: %llX\n\r", stack_base, stack_size);
+
     KiGdtInit();
     idtr_t idtr = KiIdtInit();
     (void)idtr;
-
-	uint64_t RAMSize = 0;
-	
-	uint64_t RAMEntrySizes[memmap_request.response->entry_count];
-	uint64_t RAMEntryBase[memmap_request.response->entry_count];
-	size_t RAMEntrySizesPtr = 0;
-	
-	for (size_t i = 0; i < memmap_request.response->entry_count; i++) {
-		struct limine_memmap_entry* entry = memmap_request.response->entries[i];
-	
-		if (entry->type == LIMINE_MEMMAP_USABLE || entry->type == LIMINE_MEMMAP_FRAMEBUFFER) {
-			RAMSize += entry->length;
-	
-			if (entry->type != LIMINE_MEMMAP_FRAMEBUFFER) {
-				RAMEntrySizes[RAMEntrySizesPtr] = entry->length;
-				RAMEntryBase[RAMEntrySizesPtr] = entry->base;
-				RAMEntrySizesPtr++;
-			}
-		}
-	}
-	
-	printk("uint64_t RAMSize = 0x%llx;\n\r", RAMSize);
-	
-	for (size_t i = 0; i < RAMEntrySizesPtr; i++) {
-		printk("uint64_t RAMEntryCount[0x%llX] = 0x%llX;\n\r", i, RAMEntrySizes[i]);
-	}
-	
-	uint64_t RAMSizeQuotient = RAMSize / (1024ULL * 1024 * 1024);
-	uint64_t RAMSizeRemainder = RAMSize % (1024ULL * 1024 * 1024);
-	
-	if (RAMSizeRemainder >= (512ULL * 1024 * 1024)) {
-		RAMSizeQuotient += 1;
-	}
-	
-	printk("uint64_t RAMSizeRound = %llu;\n\r", RAMSizeQuotient);
-	
-	size_t LargestIndex = 0;
-	
-	for (size_t i = 1; i < RAMEntrySizesPtr; i++) {
-		if (RAMEntrySizes[i] > RAMEntrySizes[LargestIndex] &&
-			RAMEntryBase[i] < RAMSize - ((2ULL * 1024 * 1024 * 1024) - 4096)
-		) {
-			LargestIndex = i;
-		}
-	}
-	
-	printk("Largest index below the topmost 2GiB region is index: %llu\n\rSize: 0x%llX\n\rBase: 0x%llX\n\r",
-		LargestIndex, RAMEntrySizes[LargestIndex], RAMEntryBase[LargestIndex]);
-
-	KiPmmInit(RAMEntryBase[LargestIndex], RAMEntrySizes[LargestIndex]);
-
-	hcf();
 
 	PitInit(1000);
 
@@ -166,6 +133,10 @@ void KiStartupInit(void) {
 	FB_HEIGHT = framebuffer->height;
 	FB_FLANTERM_CHAR_WIDTH = 1;
 	FB_FLANTERM_CHAR_HEIGHT = 1;
+
+	KiMMap((void*)0x3000, (void*)0x3000, MMAP_PRESENT);
+
+	hcf();
 
     printk("\e[2J\e[H");
 
@@ -182,5 +153,5 @@ void _kernel_idle_process() {
 
 	KiReadHidC();
 
-	LoadKernelElf(nutshell, 0, 0, 0);
+	LoadKernelElf((void*)nutshell, 0, 0, 0);
 }
