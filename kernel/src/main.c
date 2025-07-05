@@ -69,7 +69,9 @@ uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
 uint64_t HhdmOffset;
 uint64_t RamSize = 0;
 
-#define __CONFIG_SERIAL_E9_ENABLE 0
+#define __CONFIG_SERIAL_E9_ENABLE 1
+
+__attribute__((aligned(0x1000))) uint8_t _pmm_mem[4*1024*1024] = {0};
 
 void KiStartupInit(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
@@ -113,19 +115,18 @@ void KiStartupInit(void) {
 			continue; /* idk but it's trust issues */
 	}
 
-	extern char __bss_stack_start[];
-	extern char __bss_stack_end[];
-	
-	void* stack_base = __bss_stack_start;
-	size_t stack_size = __bss_stack_end - __bss_stack_start;
+	void* stack_base = (void*)&_pmm_mem;
+	size_t stack_size = sizeof(_pmm_mem);
 
-	KiPmmInit(stack_base, stack_size);
+	printk("Init PMM with parameters:\n\rBASE: %llX\n\rSIZE: %llX\n\r", VIRT_TO_PHYS(stack_base, RamSize), stack_size);
 	
-	printk("Init PMM with parameters:\n\rBASE: %llX\n\rSIZE: %llX\n\r", stack_base, stack_size);
+	KiPmmInit(VIRT_TO_PHYS(stack_base, RamSize), stack_size);
+
+	printk("PMM Initiated successfully\n\r");
 
     KiGdtInit();
-    idtr_t idtr = KiIdtInit();
-    (void)idtr;
+    //idtr_t idtr = KiIdtInit();
+    //(void)idtr;
 
 	PitInit(1000);
 
@@ -134,7 +135,10 @@ void KiStartupInit(void) {
 	FB_FLANTERM_CHAR_WIDTH = 1;
 	FB_FLANTERM_CHAR_HEIGHT = 1;
 
-	KiMMap((void*)0x3000, (void*)0x3000, MMAP_PRESENT);
+	//KiMMap((void*)0x3000, (void*)0x3000, MMAP_PRESENT | MMAP_RW);
+
+	*(uint8_t*)0xFFFFFFFF80400000 = 0xAB;
+	printk("%x\n\r", *(uint8_t*)VIRT_TO_PHYS(0xFFFFFFFF80400000, RamSize));
 
 	hcf();
 

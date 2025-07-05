@@ -15,13 +15,10 @@ typedef struct {
 #define PAGE_PSE         0x080
 #define PAGE_ADDR_MASK   0xFFFFFFFFF000ULL
 
-extern uint64_t RamSize;
+#define HHDM_VIRT_BASE 0xFFFFFFFF80000000
 
-#define PHYS_TO_VIRT(paddr) \
-    ((void *)((uint64_t)(paddr) - ((RamSize) - 0x80000000) + 0xFFFFFFFF80000000))
-
-#define VIRT_TO_PHYS(vaddr) \
-    ((uint64_t)(vaddr) - 0xFFFFFFFF80000000 + ((RamSize) - 0x80000000))
+uintptr_t VIRT_TO_PHYS(uintptr_t vaddr, uint64_t RamSize);
+uintptr_t PHYS_TO_VIRT(uintptr_t paddr, uint64_t RamSize);
 
 // --- Basic access permissions ---
 #define MMAP_PRESENT    (1ULL << 0)   // Page is present

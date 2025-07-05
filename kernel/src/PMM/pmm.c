@@ -29,6 +29,7 @@ static inline bool bitmap_test(size_t bit) {
 }
 
 void KiPmmInit(uintptr_t mem_base, size_t mem_size) {
+	printk("KiPmmInit(%p, %p);\n\r", mem_base, mem_size);
     size_t bitmap_size = mem_size / 8;
     uintptr_t bitmap_addr = mem_base + mem_size - bitmap_size;
     size_t usable_size = bitmap_addr - mem_base;
