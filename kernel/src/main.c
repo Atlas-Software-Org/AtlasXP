@@ -118,9 +118,9 @@ void KiStartupInit(void) {
 	void* stack_base = (void*)&_pmm_mem;
 	size_t stack_size = sizeof(_pmm_mem);
 
-	printk("Init PMM with parameters:\n\rBASE: %llX\n\rSIZE: %llX\n\r", VIRT_TO_PHYS(stack_base, RamSize), stack_size);
+	//printk("Init PMM with parameters:\n\rBASE: %llX\n\rSIZE: %llX\n\r", VIRT_TO_PHYS(stack_base, RamSize), stack_size);
 	
-	KiPmmInit(VIRT_TO_PHYS(stack_base, RamSize), stack_size);
+	KiPmmInit((void*)((uint64_t)stack_base - hhdm_request.response->offset), stack_size);
 
 	printk("PMM Initiated successfully\n\r");
 
@@ -134,13 +134,6 @@ void KiStartupInit(void) {
 	FB_HEIGHT = framebuffer->height;
 	FB_FLANTERM_CHAR_WIDTH = 1;
 	FB_FLANTERM_CHAR_HEIGHT = 1;
-
-	//KiMMap((void*)0x3000, (void*)0x3000, MMAP_PRESENT | MMAP_RW);
-
-	*(uint8_t*)0xFFFFFFFF80400000 = 0xAB;
-	printk("%x\n\r", *(uint8_t*)VIRT_TO_PHYS(0xFFFFFFFF80400000, RamSize));
-
-	hcf();
 
     printk("\e[2J\e[H");
 

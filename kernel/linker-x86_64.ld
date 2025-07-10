@@ -58,6 +58,11 @@ SECTIONS
 	.bss : ALIGN(0x1000) {
 	    *(.bss .bss.*);
 	    *(COMMON);
+
+	    . = ALIGN(0x400000);
+	    __bss_stack_start = .;
+	    . = . + 4M;
+	    __bss_stack_end = .;
 	} :data
 
 	VirtualEndKernel = ALIGN(0x1000);
