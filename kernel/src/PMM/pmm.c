@@ -1,75 +1,119 @@
 #include "pmm.h"
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
-
-#define PAGE_SIZE 0x1000
+#include <ELF/elf.h>
 
 typedef struct {
-    uint8_t* bitmap;
-    size_t bitmap_size;
-    uintptr_t base;
+    uint8_t *bitmap;
+    int pidTrace[0x1000];
+    size_t bitmap_size_bytes;
     size_t total_pages;
     size_t free_pages;
-} Pmm;
+    size_t endKernelAligned_;
+} PmmManager;
 
-static Pmm pmm;
-int IsPmmEnabled = 0;
+static PmmManager pmm;
 
-static inline void bitmap_set(size_t bit) {
-    pmm.bitmap[bit >> 3] |= 1 << (bit & 7);
-}
+/* Kernel-callable PMM initialization
+   bitmap_mem points to preallocated memory for the bitmap
+*/
+int KiPmmInit(uint64_t total_mem_bytes, uint32_t page_size, uint8_t *bitmap_mem, size_t bitmap_mem_size, size_t endKernelAligned_) {
+    (void)endKernelAligned_;
+    pmm.total_pages = total_mem_bytes / page_size;
+    pmm.free_pages = pmm.total_pages;
+    pmm.bitmap_size_bytes = (pmm.total_pages + 7) / 8;
 
-static inline void bitmap_clear(size_t bit) {
-    pmm.bitmap[bit >> 3] &= ~(1 << (bit & 7));
-}
+    if (bitmap_mem_size < pmm.bitmap_size_bytes) return -1;
 
-static inline bool bitmap_test(size_t bit) {
-    return pmm.bitmap[bit >> 3] & (1 << (bit & 7));
-}
+    pmm.bitmap = bitmap_mem;
 
-void KiPmmInit(uintptr_t mem_base, size_t mem_size) {
-	printk("KiPmmInit(%p, %p);\n\r", mem_base, mem_size);
-    size_t bitmap_size = mem_size / 8;
-    uintptr_t bitmap_addr = mem_base + mem_size - bitmap_size;
-    size_t usable_size = bitmap_addr - mem_base;
-    size_t total_pages = usable_size / PAGE_SIZE;
-
-    pmm.bitmap = (uint8_t*)bitmap_addr;
-    pmm.bitmap_size = bitmap_size;
-    pmm.base = mem_base;
-    pmm.total_pages = total_pages;
-    pmm.free_pages = total_pages;
-
-    for (size_t i = 0; i < (bitmap_size); i++) {
+    for (size_t i = 0; i < pmm.bitmap_size_bytes; i++) {
         pmm.bitmap[i] = 0;
     }
 
-    IsPmmEnabled = 1;
+    for (int i = 0; i < 0x1000; i++) {
+        pmm.pidTrace[i] = 0;
+    }
+
+    return 0;
 }
 
-void* KiPmmAlloc(void) {
-    if (!IsPmmEnabled) return NULL;
+static inline void PmmSetBit(uint8_t *bitmap, size_t bit) {
+    bitmap[bit / 8] |= (1 << (bit % 8));
+}
+
+static inline void PmmClearBit(uint8_t *bitmap, size_t bit) {
+    bitmap[bit / 8] &= ~(1 << (bit % 8));
+}
+
+static inline int PmmTestBit(uint8_t *bitmap, size_t bit) {
+    return (bitmap[bit / 8] >> (bit % 8)) & 1;
+}
+
+void* KiPmmAlloc() {
     for (size_t i = 0; i < pmm.total_pages; i++) {
-        if (!bitmap_test(i)) {
-            bitmap_set(i);
+        if (!PmmTestBit(pmm.bitmap, i)) {
+            PmmSetBit(pmm.bitmap, i);
             pmm.free_pages--;
-            return (void*)(pmm.base + (i * PAGE_SIZE));
+            pmm.pidTrace[i] = CurrentPid;
+            return (void*)(pmm.endKernelAligned_ + (i * 0x1000));
         }
     }
     return NULL;
 }
 
-void KiPmmFree(void* ptr) {
-    if (!IsPmmEnabled) return;
-    uintptr_t addr = (uintptr_t)ptr;
-    if (addr < pmm.base) return;
+void* KiPmmNAlloc(size_t count) {
+    void* initial = KiPmmAlloc();
+    if (initial == NULL) return NULL;
 
-    size_t index = (addr - pmm.base) / PAGE_SIZE;
-    if (index >= pmm.total_pages) return;
+    for (size_t i = 1; i < count; i++) {
+        void* test = KiPmmAlloc();
+        if (test == NULL) return NULL;
+    }
 
-    if (bitmap_test(index)) {
-        bitmap_clear(index);
+    return initial;
+}
+
+void KiPmmFree(void* frame_ptr) {
+    uintptr_t addr = (uintptr_t)frame_ptr;
+    if (addr < pmm.endKernelAligned_) return;
+
+    size_t frame = (addr - pmm.endKernelAligned_) / 0x1000;
+    if (frame >= pmm.total_pages) return;
+
+    if (PmmTestBit(pmm.bitmap, frame)) {
+        PmmClearBit(pmm.bitmap, frame);
         pmm.free_pages++;
+        pmm.pidTrace[frame] = 0;
+    }
+}
+
+void KiPmmNFree(void* frame_ptr, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        KiPmmFree((void*)((uintptr_t)frame_ptr + (i * 0x1000)));
+    }
+}
+
+size_t KiPmmGetTotalPages() {
+    return pmm.total_pages;
+}
+
+size_t KiPmmGetFreePages() {
+    return pmm.free_pages;
+}
+
+static void KiPmmFreeFrame(int frame) {
+    if (frame >= pmm.total_pages) return;
+
+    if (PmmTestBit(pmm.bitmap, frame)) {
+        PmmClearBit(pmm.bitmap, frame);
+        pmm.free_pages++;
+        pmm.pidTrace[frame] = 0;
+    }
+}
+
+void KiPmmClearPidTracedResources(int pid) {
+    for (size_t i = 0; i < pmm.total_pages; i++) {
+        if (pmm.pidTrace[i] == pid) {
+            KiPmmFreeFrame(i);
+        }
     }
 }

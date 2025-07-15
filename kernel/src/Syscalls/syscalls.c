@@ -176,10 +176,10 @@ void SyscallHandler(int *__unused) {
         case AxpPowerModeSet:
             break;
         case AxpGetTermWidth:
-        	Registers.rax = FB_WIDTH/FB_FLANTERM_CHAR_WIDTH;
+        	Registers.rax = FB_FLANTERM_CHAR_WIDTH;
         	break;
         case AxpGetTermHeight:
-        	Registers.rax = FB_HEIGHT/FB_FLANTERM_CHAR_HEIGHT;
+        	Registers.rax = FB_FLANTERM_CHAR_HEIGHT;
     }
 
     x86SetRegSysV(&Registers);

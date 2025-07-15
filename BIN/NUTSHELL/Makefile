@@ -1,0 +1,2 @@
+run:
+	$(MAKE) -C ../ run

@@ -1,0 +1,7 @@
+#!/bin/env sh
+
+echo "Prerequisites (INSTALLING VIA APT): clang, ld.lld, make, cpio, binutils, build-essential"
+
+# YOU CAN CONFIGURE THIS FILE TO YOUR PREFERENCE TO USE ANOTHER PACKAGE MANAGERS SUCH AS PACMAN OR DNF, ETC...
+
+sudo apt install clang lld make cpio binutils build-essential

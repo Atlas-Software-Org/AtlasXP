@@ -5,6 +5,8 @@
 #include <flanterm/flanterm_backends/fb.h>
 #include <printk/printk.h>
 
+typedef void* ptr;
+
 void outb(uint16_t port, uint8_t byte);
 uint8_t inb(uint16_t port);
 void outw(uint16_t port, uint16_t word);
@@ -32,5 +34,6 @@ char* strstr(const char* haystack, const char* needle);
 char* strtok(char* str, const char* delim);
 
 void KiPanic(const char* __restrict string, int _halt);
+void DisplaySplash(int w, int h, char* text); /* w: width of display in characters, h: height of display in characters */
 
 #endif /* KISIMPLE_H */

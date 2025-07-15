@@ -1,0 +1,2 @@
+Hello, World! from a CPIO-NEWC archive hello.txt file!!!
+Newline also works btw... unless you see it on the same line then we are cooked

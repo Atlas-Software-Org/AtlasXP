@@ -166,15 +166,19 @@ kernel-deps:
 .PHONY: kernel
 kernel: kernel-deps
 	$(MAKE) -C BIN
+	$(MAKE) -C INIT
 	$(MAKE) -C kernel
 
-$(IMAGE_NAME).iso: limine/limine kernel
+$(IMAGE_NAME).iso: limine/limine kernel INIT/init.cpio
 	@rm -rf iso_root
-	@mkdir -p iso_root/boot
+	@mkdir -p iso_root/boot/
+	@mkdir -p iso_root/boot/limine/
+	@mkdir -p iso_root/EFI/
+	@mkdir -p iso_root/EFI/BOOT/
+	@mkdir -p iso_root/init/
 	@cp -v kernel/bin-$(ARCH)/kernel iso_root/boot/
-	@mkdir -p iso_root/boot/limine
 	@cp -v limine.conf iso_root/boot/limine/
-	@mkdir -p iso_root/EFI/BOOT
+	@cp -v INIT/init.cpio iso_root/init/init.cpio
 ifeq ($(ARCH),x86_64)
 	@cp -v limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
 	@cp -v limine/BOOTX64.EFI iso_root/EFI/BOOT/
@@ -242,6 +246,9 @@ endif
 ifeq ($(ARCH),loongarch64)
 	mcopy -i $(IMAGE_NAME).hdd@@1M limine/BOOTLOONGARCH64.EFI ::/EFI/BOOT
 endif
+	mmd -i $(IMAGE_NAME).hdd@@1M ::/init
+	mcopy -i $(IMAGE_NAME).hdd@@1M INIT/init.cpio ::/init/init.cpio
+	mcopy -i $(IMAGE_NAME).hdd@@1M FsTests/filename.txt ::/filename.txt
 
 .PHONY: clean
 clean:

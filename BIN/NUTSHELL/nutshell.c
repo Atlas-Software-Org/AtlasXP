@@ -7,36 +7,52 @@
 
 extern void* gSignalBuffer;
 
+void PrintNutshellLogo();
+void RunTextEditor();
+void RestoreUserInfoPastElev();
+
+void cmd_help();
+void cmd_clear();
+void cmd_ascii();
+void cmd_banner();
+void cmd_calc();
+void cmd_drawbox();
+void cmd_echo(char* args);
+void cmd_elev();
+void cmd_poke();
+void cmd_peek();
+void cmd_version();
+void cmd_whoami();
+void cmd_addusr(char* username);
+void cmd_beusr(char* username);
+void cmd_lsusr();
+void cmd_read_signal_buf();
+void cmd_be_elevated_user();
+
 void PrintNutshellLogo() {
-	printf(" ___________\n");
-	printf("/           \\\n");
-	printf("|  GO NUTS  |\n");
-	printf("|           |\n");
-	printf("|  _______  |\n");
-	printf("| | NUTS! | |\n");
-	printf("| |50% Off| |\n");
-	printf("| |_______| |\tMk1 - VDISK Version\n");
+	 printf(" ___________\n");
+	 printf("/           \\\n");
+	 printf("| NUTSHELL! |\n");
+	 printf("|           |\n");
+	 printf("|  _______  |\n");
+	 printf("| | NUTS! | |\n");
+	 printf("| |50%% Off| |\tMk1 - VDISK Version\n");
 	printf("\\___________/\n\n");
 }
 
-/* REMOVE THIS COMMENT NEXT UPDATE - BUG FIXED:
-	- If "int logged_in_users = 0;" then when creating a user NUTSHELL would overwrite the elevated "nutshell" user with another user,
-	causing lsusr to fail to display the elevated user "nutshell".
-	- Fixed to be "int logged_in_users = 1;". Using this method "lsusr" command is aware of the elevated "nutshell" user, and "addusr" command is also aware of the existance
-	of the elevated user "nutshell". Using this fix addusr wouldnt overwrite "nutshell" elevated user with another user, which was a serious problem since before changing
-	elevated user "nutshell" to index -1, it was using index 0, which meant when creating a user there is no use of it, since it will also be with elevated privellages
-	as the elevated user "nutshell" does.
-*/
+
 int logged_in_users = 1;
-char Users[64][32] = {
-	[0] = "nutshell",
-};
+char Users[64][32] = { [0] = "nutshell" };
 char CurrentUser[32] = "nutshell";
-int CurrentUserI = -1;
+int CurrentUserI = 0;
+
+int EnabledElevatedUserByCmd = 0;
+int ElevatedUserInfoCurrentUserI = 0;
+char ElevatedUserInfoCurrentUser[32] = {0};
 
 void RunTextEditor();
 
-const char* AsciiTable = 
+const char AsciiTable[] = 
 "Dec Hex    Dec Hex    Dec Hex  Dec Hex  Dec Hex  Dec Hex   Dec Hex   Dec Hex\n"
 "  0 00 NUL  16 10 DLE  32 20    48 30 0  64 40 @  80 50 P   96 60 `  112 70 p\n"
 "  1 01 SOH  17 11 DC1  33 21 !  49 31 1  65 41 A  81 51 Q   97 61 a  113 71 q\n"
@@ -63,103 +79,53 @@ void ShellLoop() {
 		if (!fgets(input, sizeof(input), stdin)) continue;
 
 		int count = strlen(input);
-		if (count > 0 && input[count - 1] == '\n')
-			input[count - 1] = 0;
+		if (count > 0 && input[count - 1] == '\n') input[count - 1] = 0;
 
 		char* cmd = strtok(input, " ");
 		if (!cmd) continue;
 
 		if (!strcmp(cmd, "exit")) {
-			exit(0);
+			if (EnabledElevatedUserByCmd)
+				RestoreUserInfoPastElev();
+			else
+				exit(0);
 		} else if (!strcmp(cmd, "help")) {
-			printf("Nutshell v1.0.0 - Commands:\n");
-			printf("  ascii              Print ASCII table\n");
-			printf("  addusr             Add a user to NUTSHELL\n");
-			printf("  banner             Show NUTSHELL banner\n");
-			printf("  beusr              Become another user\n");
-			printf("  calc               Start the calculator interface\n");
-			printf("  clear              Clear the TTY view\n");
-			printf("  drawbox            Interactive command line draw app\n");
-			printf("  exit               Exit the shell\n");
-			printf("  echo               Echoes back text\n");
-			printf("  elev               Elevate user to NUTSHELL admin privellages\n");
-			printf("  help               Show this help text\n");
-			printf("  lsusr              List all users\n");
-			printf("  poke [E]           Poke memory with a value\n");
-			printf("  peek               Read a memory address (up to 512 bytes)\n");
-			printf("  version            Current NUTSHELL version\n");
-			printf("  whoami             Which user is currently using NUTSHELL\n");
+			cmd_help();
 		} else if (!strcmp(cmd, "clear")) {
-			printf("\e[2J\e[H");
+			cmd_clear();
 		} else if (!strcmp(cmd, "ascii")) {
-			printf("%s\n", AsciiTable);
+			cmd_ascii();
 		} else if (!strcmp(cmd, "banner")) {
-			PrintNutshellLogo();
+			cmd_banner();
 		} else if (!strcmp(cmd, "calc")) {
-			printf("Nutshell not cracked yet...\n\r");
+			cmd_calc();
 		} else if (!strcmp(cmd, "drawbox")) {
-			printf("Nutshell not cracked yet...\n\r");
+			cmd_drawbox();
 		} else if (!strcmp(cmd, "echo")) {
-			char* echo_text = (char*)&cmd[5];
-			printf("%s\n\r", echo_text);
+			cmd_echo(strtok(NULL, ""));
 		} else if (!strcmp(cmd, "elev")) {
-			printf("Nutshell not cracked yet...\n\r");
+			cmd_elev();
 		} else if (!strcmp(cmd, "poke")) {
-			if (CurrentUserI == 0) {
-				printf("Nutshell not cracked yet...\n\r");
-			} else {
-				printf("Requires elevated privellages...\n\r");
-			}
+			cmd_poke();
 		} else if (!strcmp(cmd, "peek")) {
-			printf("Nutshell not cracked yet...\n\r");
+			cmd_peek();
 		} else if (!strcmp(cmd, "version")) {
-			printf("Nutshell version 1.0.0 - Atlas Software & Microsystems Corp.\n\r");
+			cmd_version();
 		} else if (!strcmp(cmd, "whoami")) {
-			if (CurrentUserI == -1) printf("You are in a ");
-			printf("%s", CurrentUser);
-			if (CurrentUserI == -1) printf("! :)");
-			printf("\n\r");
+			cmd_whoami();
 		} else if (!strcmp(cmd, "addusr")) {
 			char* username = strtok(NULL, " ");
-			if (username == NULL) continue;
-			strcpy(Users[logged_in_users++], username);
+			cmd_addusr(username);
 		} else if (!strcmp(cmd, "beusr")) {
 			char* username = strtok(NULL, " ");
-			if (!strcmp(username, "nutshell")) {
-				printf("Cannot be \"nutshell\", to switch to \"nutshell\" use the \"elev\" command\n\r");
-				username[0] = 0;
-			}
-			int idx = -1;
-			for (int i = 0; i < logged_in_users; i++) {
-				if (!strcmp(Users[i], username)) {
-					CurrentUserI = i;
-					int last = 0;
-					for (int j = 0; username[j] != 0 && j < 32; j++) {
-						CurrentUser[j] = username[j];
-						last = j;
-					}
-					last++;
-					for (int j = last; j < 32; j++) {
-						CurrentUser[j] = 0;
-					}
-				}
-			}
+			cmd_beusr(username);
 		} else if (!strcmp(cmd, "lsusr")) {
-			for (int i = 0; i < logged_in_users; i++) {
-				printf("%s\n", Users[i]);
-			}
+			cmd_lsusr();
 		} else if (!strcmp(cmd, "nutshell::read_signal_buf")) {
-			printf("Signal buffer: %d\n\r", *(int*)gSignalBuffer);
-		} else if (!strcmp(cmd, "nutshell:be_elevated_user")) {
-			CurrentUserI = -1;
-			char nutshell_name[32] = {0};
-			strncpy(nutshell_name, "nutshell", strlen("nutshell"));
-			for (int i = 0; i < 32; i++) {
-				CurrentUser[i] = nutshell_name[i];
-			}
-		}
-
-		else {
+			cmd_read_signal_buf();
+		} else if (!strcmp(cmd, "nutshell::be_elevated_user")) {
+			cmd_be_elevated_user();
+		} else {
 			printf("Unknown command: %s\n", cmd);
 		}
 	}
@@ -168,10 +134,128 @@ void ShellLoop() {
 int main(int argc, char** argv, char** envp) {
 	(void)argc; (void)argv; (void)envp;
 
-	printf("SIGNAL BUFFER AT %p\n\r", gSignalBuffer);
-	printf("SIGNAL0 RECIEVED: %d\n\r", *(int*)gSignalBuffer);
-
 	PrintNutshellLogo();
 	ShellLoop();
 	return 0;
+}
+
+void cmd_help() {
+	printf("Nutshell v1.0.0 - Commands:\n");
+	printf("  ascii              Print ASCII table\n");
+	printf("  addusr             Add a user to NUTSHELL\n");
+	printf("  banner             Show NUTSHELL banner\n");
+	printf("  beusr              Become another user\n");
+	printf("  calc               Start the calculator interface\n");
+	printf("  clear              Clear the TTY view\n");
+	printf("  drawbox            Interactive command line draw app\n");
+	printf("  exit               Exit the shell\n");
+	printf("  echo               Echoes back text\n");
+	printf("  elev               Elevate user to NUTSHELL admin privellages\n");
+	printf("  help               Show this help text\n");
+	printf("  lsusr              List all users\n");
+	printf("  poke [E]           Poke memory with a value\n");
+	printf("  peek               Read a memory address (up to 512 bytes)\n");
+	printf("  version            Current NUTSHELL version\n");
+	printf("  whoami             Which user is currently using NUTSHELL\n");
+}
+
+void cmd_clear() {
+	printf("\x1b[?25l\e[2J\e[H\x1b[?25h");
+}
+
+void cmd_ascii() {
+	printf("%s\n", AsciiTable);
+}
+
+void cmd_banner() {
+	PrintNutshellLogo();
+}
+
+void cmd_calc() {
+	printf("Nutshell was not cracked yet...\n\r");
+}
+
+void cmd_drawbox() {
+	printf("Nutshell was not cracked yet...\n\r");
+}
+
+void cmd_echo(char* args) {
+	if (args) printf("%s\n\r", args);
+}
+
+void cmd_elev() {
+	CurrentUserI = 0;
+	EnabledElevatedUserByCmd = 1;
+	strncpy(ElevatedUserInfoCurrentUser, CurrentUser, 32);
+	ElevatedUserInfoCurrentUserI = CurrentUserI;
+	strcpy(CurrentUser, "nutshell");
+}
+
+void cmd_poke() {
+	if (CurrentUserI == 0)
+		printf("Nutshell was not cracked yet...\n\r");
+	else
+		printf("Requires elevated privellages...\n\r");
+}
+
+void cmd_peek() {
+	printf("Nutshell was not cracked yet...\n\r");
+}
+
+void cmd_version() {
+	printf("Nutshell version 1.0.0 - Atlas Software & Microsystems Corp.\n\r");
+}
+
+void cmd_whoami() {
+	if (CurrentUserI == -1) printf("You are in a ");
+	printf("%s", CurrentUser);
+	if (CurrentUserI == -1) printf("! :)");
+	printf("\n\r");
+}
+
+void cmd_addusr(char* username) {
+	if (!username) {
+		printf("Usage: addusr <USERNAME>\n\r");
+		return;
+	}
+	for (int i = 0; i < logged_in_users; i++) {
+		if (!strcmp(Users[i], username)) return;
+	}
+	if (logged_in_users < 64)
+		strcpy(Users[logged_in_users++], username);
+}
+
+void cmd_beusr(char* username) {
+	if (!username) return;
+	if (!strcmp(username, "nutshell")) {
+		printf("Cannot be \"nutshell\", to switch to \"nutshell\" use the \"elev\" command\n\r");
+		return;
+	}
+	for (int i = 0; i < logged_in_users; i++) {
+		if (!strcmp(Users[i], username)) {
+			CurrentUserI = i;
+			strncpy(CurrentUser, username, 31);
+			CurrentUser[31] = 0;
+			return;
+		}
+	}
+}
+
+void cmd_lsusr() {
+	for (int i = 0; i < logged_in_users; i++) {
+		printf("%s\n", Users[i]);
+	}
+}
+
+void cmd_read_signal_buf() {
+	printf("Signal buffer: %d\n\r", *(int*)gSignalBuffer);
+}
+
+void cmd_be_elevated_user() {
+	CurrentUserI = 0;
+	strcpy(CurrentUser, "nutshell");
+}
+
+void RestoreUserInfoPastElev() {
+	cmd_beusr(ElevatedUserInfoCurrentUser);
 }

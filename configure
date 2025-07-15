@@ -25,4 +25,5 @@ struct flanterm_context *GetGlobalFtCtx();"
 
 echo "Run the OS with 'make run'"
 echo "Compile the OS with 'make'"
-echo "Prerequisites: clang, ld.lld, make"
+echo "Prerequisites: clang, ld.lld, make, cpio, binutils, build-essential"
+echo "Run ./install_dependencies to install the packages listed above (ASSUMES APT NOT OTHER PACKAGE MANAGERS)"

@@ -65,8 +65,6 @@ void LoadKernelRelocatableElf(void* elf_data) {
 	    }
 
 	    KiMMap(target, target, MMAP_PRESENT | MMAP_RW);
-
-	    printk("{ ELF Info } Mapped section %s to 0x%p (%lu bytes)\n\r", name, target, sh->sh_size);
 	}
 
 	if (!entry_found) {
@@ -149,8 +147,6 @@ void LoadKernelElf(void* elf_data, int argc, char** argv, char** envp) {
 	for (int i = 0; i < ehdr->e_shnum; i++) {
 	    Elf64_Shdr* shdr_i = &section_table[i];
 	    const char* name = shstrtab + shdr_i->sh_name;
-
-	    printk("SECTION FOUND WITH NAME: %s\n\r", name);
 	}
 
     Elf64_Phdr* phdrs = (Elf64_Phdr*)((uint8_t*)elf_data + ehdr->e_phoff);
@@ -177,7 +173,6 @@ void LoadKernelElf(void* elf_data, int argc, char** argv, char** envp) {
 	    }
 
 	    case ET_EXEC:
-	        printk("{ ELF Info } Loading statically linked executable\n\r");
 	        break;
 
 	    case ET_DYN:

@@ -15,10 +15,8 @@ typedef struct {
 #define PAGE_PSE         0x080
 #define PAGE_ADDR_MASK   0xFFFFFFFFF000ULL
 
-#define HHDM_VIRT_BASE 0xFFFFFFFF80000000
-
-uintptr_t VIRT_TO_PHYS(uintptr_t vaddr, uint64_t RamSize);
-uintptr_t PHYS_TO_VIRT(uintptr_t paddr, uint64_t RamSize);
+#define PHYS_TO_VIRT(paddr) ((void*)(0xFFFF800000000000ULL + (paddr)))  // Your kernel's mapping base
+#define VIRT_TO_PHYS(vaddr) ((uint64_t)(vaddr) - 0xFFFF800000000000ULL) // If needed
 
 // --- Basic access permissions ---
 #define MMAP_PRESENT    (1ULL << 0)   // Page is present
