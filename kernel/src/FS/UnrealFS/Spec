@@ -1,0 +1,49 @@
+Guide:
+"---" after a type means MUST BE EQUAL TO
+"----" after a type or "---" means DEFINITION OF FIELD
+"-----" on a newline means continuing the comment above
+"------" important notice
+
+SuperBlock:
+
+uint8_t SuperBlockSignature[5] --- "UFSSB"
+uint32_t LBA_DataBegin --- Defined in the EBPB reserved uint32_t sections
+uint32_t LBA_DataEnd
+uint32_t Clus_DataBegin
+uint32_t Clus_DataEnd
+uint8_t SectorsPerCluster
+uint32_t TotalAllocatedMOTClusters
+uint32_t TotalClusters
+uint32_t LBA_MOT
+uint32_t Clus_MOT
+uint16_t FSVersion
+uint32_t LBA_ReservedSuperBlockBackup0
+uint32_t LBA_ReservedSuperBlockBackup1
+uint32_t LBA_SuperBlockCacheBackup2 ---- Use this to play around with the SuperBlock, and before shutdown or reboot or change of powerstate you can write the SuperBlock
+----- optional and this feature can be ignored
+uint16_t EndOfSuperBlockSignature --- 0xFFEF
+
+MOT (Master object table):
+
+uint32_t TotalObjects
+MotObject* Objects;
+uint16_t EndOfMOTSignature --- 0xFF09
+
+MotObject:
+
+uint8_t ObjectType
+uint64_t UnixCreateTime
+uint8_t ObjectPermissions
+uint16_t OwnerID
+uint16_t GroupID
+uint8_t ObjectFlags
+uint64_t ObjectDataSize
+uint32_t ObjectClusterStart
+uint32_t ObjectClusterEnd
+uint8_t ObjectNameLength
+MotObject ParentObject
+char* ObjectName
+uint16_t EndOfObjectSignature --- 0xFF0F
+
+
+------ every single entry is aligned to a cluster (a cluster is two 512 sectors, or one kilobyte)

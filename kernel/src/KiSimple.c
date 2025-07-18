@@ -204,6 +204,15 @@ char* strtok(char* str, const char* delim) {
     return start;
 }
 
+char* strrchr(const char* s, int c) {
+	const char* last = 0;
+	while (*s) {
+		if (*s == (char)c) last = s;
+		s++;
+	}
+	return (char*)last;
+}
+
 static void halt_catch_fire_x86() {
     while (1) {asm volatile ("hlt");}
 }
@@ -221,6 +230,8 @@ void KiPanic(const char* __restrict string, int _halt) {
 }
 
 void DisplaySplash(int w, int h, char* text) {
+	printk("\x1b[0;0HASNU 1.0.0-rc01");
+
     int lf_count = 0;
     int i = 0;
     char *line_start = text;
@@ -312,6 +323,4 @@ void DisplaySplash(int w, int h, char* text) {
         printk("\x1b[%d;%dH", center_y + line_num + 2, center_x + 1);
         printk("\x1b[90m%s\x1b[0m", info);
     }
-
-    printk("\e[2J\e[H");
 }

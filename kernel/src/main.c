@@ -13,16 +13,18 @@
 #include <PMM/pmm.h>
 #include <VMM/vmm.h>
 #include <PCI/pci.h>
+#include <Heap/Heap.h>
 
 #include <Drivers/PS2Keyboard.h>
 #include <Drivers/AHCI.h>
+#include <Drivers/E1000.h>
 
 #include <Syscalls/syscalls.h>
 
 #include <ELF/elf.h>
 #include <BIN/nutshell.h>
 
-#include <FS/FAT32/ff.h>
+#include <FS/FAT32/fat32.h>
 
 __attribute__((used, section(".limine_requests")))
 static volatile LIMINE_BASE_REVISION(3);
@@ -40,11 +42,6 @@ static volatile struct limine_hhdm_request hhdm_request = {
 __attribute__((used, section(".limine_requests")))
 static volatile struct limine_memmap_request memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST,
-    .revision = 0
-};
-__attribute__((used, section(".limine_requests")))
-static volatile struct limine_module_request module_request = {
-    .id = LIMINE_MODULE_REQUEST,
     .revision = 0
 };
 
@@ -66,8 +63,8 @@ static void hcf(void) {
     }
 }
 
-static void hcf_delayed(int cycles) {
-	for (int i = 0; i < cycles * 2; i++) {
+static void hcf_delayed(uint64_t cycles) {
+	for (uint64_t i = 0; i < cycles * 2; i++) {
 		asm volatile ("nop;nop;nop;nop;nop");
 	}
 }
@@ -75,7 +72,7 @@ static void hcf_delayed(int cycles) {
 void DisplaySplash(int w, int h, char* text);
 
 #define __CONFIG_ENABLE_E9_OUTPUT 0
-#define __CONFIG_SPLASH_NOP_CYCLE_WASTE (0xFFFFFFFF / 2)
+#define __CONFIG_SPLASH_NOP_CYCLE_WASTE (0xFFFFFFFFFFFFFFFF / 0xFFFFFFFF / 8)
 
 uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
 uint64_t HhdmOffset;
@@ -95,17 +92,7 @@ void KiStartupInit(void) {
     if (memmap_request.response == NULL) {
         hcf();
     }
-    if (module_request.response == NULL
-     || module_request.response->module_count < 1
-     || module_request.response->modules == NULL) {
-    	hcf();
-    }
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
-    struct limine_file* init_module = module_request.response->modules[0];
-
-	if (init_module == NULL) {
-		hcf();
-	}
 
     struct flanterm_context *ft_ctx = flanterm_fb_init(
         NULL,
@@ -136,6 +123,8 @@ void KiStartupInit(void) {
 	DisplaySplash(FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT, "ASNU-Kernel project\nAtlas Software & Microsystems\n$INF<Build 1.0.0.2025>INF$");
 	hcf_delayed(__CONFIG_SPLASH_NOP_CYCLE_WASTE);
 
+	printk("\e[2J\e[H");
+
 	for (size_t i = 0; i < memmap_request.response->entry_count; i++) {
 		struct limine_memmap_entry* entry_at_i = memmap_request.response->entries[i];
 		if (entry_at_i->type == LIMINE_MEMMAP_USABLE)
@@ -159,7 +148,49 @@ void KiStartupInit(void) {
         hcf();
     }
 
-	KiMMap(0x3000, 0x3000, MMAP_PRESENT);	
+	/* FIXME:
+
+	size_t MemMapEntryCount = memmap_request.response->entry_count;
+
+	size_t MemMapEntryIndexLargest = -1;
+	size_t MemMapEntryIndexLargestSz = 0;
+
+	size_t RamSize = 0;
+
+	for (size_t i = 0; i < MemMapEntryCount; i++) {
+		struct limine_memmap_entry* entry = memmap_request.response->entries[i];
+
+		if (entry->length > MemMapEntryIndexLargestSz && entry->type == LIMINE_MEMMAP_USABLE) {
+			MemMapEntryIndexLargestSz = entry->length;
+			MemMapEntryIndexLargest = i;
+		}
+
+		if (entry->type == LIMINE_MEMMAP_USABLE) {
+			RamSize += entry->length;
+		}
+	}
+
+	if (MemMapEntryIndexLargest == -1) KiPanic("Failed to detect memory", 1);
+	if (MemMapEntryIndexLargestSz < (0x1000 * 2)) KiPanic("Failed to detect memory\n\r(Largest memory segment is smaller than two pages)", 1);
+
+	RamSize = (RamSize + ((1024ULL * 1024 * 1024) / 2)) / (1024ULL * 1024 * 1024);
+
+	printk("Detected memory\n\r%d.0 GB\n\r", RamSize);
+
+	for (size_t i = 0; i < MemMapEntryIndexLargestSz / 0x1000; i++) {
+		void* Address = (void*)((uint64_t)memmap_request.response->entries[MemMapEntryIndexLargest]->base + (i * 0x1000));
+		KiMMap(Address, Address, MMAP_PRESENT | MMAP_RW);
+	}
+
+	InitHeap(memmap_request.response->entries[MemMapEntryIndexLargest]->base, MemMapEntryIndexLargestSz);
+
+	*/
+
+	void* test = kalloc(512);
+	printk("%p: test succeeded if not 0\n\r", test);
+	printk("%p: test succeeded if 0 or page fault (free)\n\r", test);
+	kfree(test);
+	printk("%p: test succeeded if 0 or page fault\n\r", test);
 
 	PciDevice_t MassStoragePci = PciFindDeviceByClass(0x01, 0x06);
 	if (MassStoragePci.vendor_id == 0xFFFF)
@@ -168,30 +199,20 @@ void KiStartupInit(void) {
 	
 	AhciInit(&MassStoragePci);
 
-	FIL file;
-	f_open(&file, "/filename.txt", FA_READ);
-
-	FILINFO filinfo;
-	f_stat("/filename.txt", &filinfo);
-
-	int size = filinfo.fsize;
-	char buf[size + 1];
-
-	buf[size + 1] = 0;
-
-	int br = 0;
-
-	f_read(&file, buf, size, &br);
-
-	if (br != size) printk("Read invalid size\n\r");
-
-	printk("Read:\n\r%s\n\r", buf);
-
-	f_close(&file);
-
-	hcf();
-	
     printk("\e[2J\e[H");
+
+	FatCreateFile("/filename.txt");
+
+	FatFile_t* file = FatOpen("/filename.txt");
+	if (!file) {
+	    printk("Failed to open file");
+	    hcf();
+	}
+
+	const char* msg = "Hello, World! from a FAT32 file";
+	FatWrite(file, msg, strlen(msg));
+
+	FatClose(file);
 
     LoadKernelElf((void*)nutshell, 0, 0, 0);
 

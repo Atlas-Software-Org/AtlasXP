@@ -63,7 +63,7 @@ override SHARED_FLAGS := \
     -fno-stack-check \
     -fno-PIC \
     -ffunction-sections \
-    -fdata-sections
+    -fdata-sections \
 
 # Internal C/C++ preprocessor flags that should not be changed by the user.
 override CPPFLAGS_C := \

@@ -32,6 +32,7 @@ char* strncat(char* dest, const char* src, unsigned int n);
 char* strchr(const char* str, int c);
 char* strstr(const char* haystack, const char* needle);
 char* strtok(char* str, const char* delim);
+char* strrchr(const char* s, int c);
 
 void KiPanic(const char* __restrict string, int _halt);
 void DisplaySplash(int w, int h, char* text); /* w: width of display in characters, h: height of display in characters */
