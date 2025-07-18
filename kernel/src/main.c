@@ -17,7 +17,7 @@
 
 #include <Drivers/PS2Keyboard.h>
 #include <Drivers/AHCI.h>
-#include <Drivers/E1000.h>
+#include <Drivers/XHCI.h>
 
 #include <Syscalls/syscalls.h>
 
@@ -137,6 +137,14 @@ void KiStartupInit(void) {
     uint64_t endKernelAligned = (uint64_t)&a_endKernelA;
 
     KiGdtInit();
+
+	PciDevice_t xHciController = PciFindDeviceByClass(0x0C, 0x03);
+	if (xHciController.vendor_id == 0xFFFF)
+		KiPanic("Could not find an xHCI controller attached", 1);
+	PciGetDeviceMMIORegion(&xHciController);
+
+	xHciInit(&xHciController);
+    
     idtr_t idtr = KiIdtInit();
     (void)idtr;
 
@@ -186,12 +194,6 @@ void KiStartupInit(void) {
 
 	*/
 
-	void* test = kalloc(512);
-	printk("%p: test succeeded if not 0\n\r", test);
-	printk("%p: test succeeded if 0 or page fault (free)\n\r", test);
-	kfree(test);
-	printk("%p: test succeeded if 0 or page fault\n\r", test);
-
 	PciDevice_t MassStoragePci = PciFindDeviceByClass(0x01, 0x06);
 	if (MassStoragePci.vendor_id == 0xFFFF)
 		KiPanic("Could not find an AHCI (with SATA enabled) controller attached", 1);
@@ -199,20 +201,9 @@ void KiStartupInit(void) {
 	
 	AhciInit(&MassStoragePci);
 
+	hcf();
+
     printk("\e[2J\e[H");
-
-	FatCreateFile("/filename.txt");
-
-	FatFile_t* file = FatOpen("/filename.txt");
-	if (!file) {
-	    printk("Failed to open file");
-	    hcf();
-	}
-
-	const char* msg = "Hello, World! from a FAT32 file";
-	FatWrite(file, msg, strlen(msg));
-
-	FatClose(file);
 
     LoadKernelElf((void*)nutshell, 0, 0, 0);
 

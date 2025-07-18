@@ -6,7 +6,7 @@ MAKEFLAGS += -rR
 ARCH := x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 8G -debugcon stdio
+QEMUFLAGS := -m 8G -debugcon stdio -device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0 -device usb-mouse,bus=xhci.0
 
 override IMAGE_NAME := Atlas-0.0.8-$(ARCH)
 
