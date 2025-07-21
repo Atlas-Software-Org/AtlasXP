@@ -1,7 +1,7 @@
 #ifndef STDIO_H
 #define STDIO_H
 
-#include "axplibc.h"
+#include "asnulibc.h"
 
 int printf(const char* fmt, ...);
 int fputs(const char* s, FILE* f);

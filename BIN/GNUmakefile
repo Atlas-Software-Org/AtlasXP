@@ -8,9 +8,9 @@ libc:
 build:
 	@mkdir -p OUT OUT/NUTSHELL
 
-	@echo "  CC\t\tnutshell.c\tLibAxpApi.c\tAxpCrt.c\t-o nutshell"
+	@echo "  CC\t\tnutshell.c\tLibAsnuApi.c\tAsnuCrt.c\t-o nutshell"
 
-	@gcc -static -fpie -fPIC -ffreestanding -nostdlib -nolibc NUTSHELL/nutshell.c LibAxpApi/LibAxpApi.c AxpCrt.c -e _start -o OUT/NUTSHELL/nutshell $(SHARED_CC_FLAGS)
+	@gcc -static -fpie -fPIC -ffreestanding -nostdlib -nolibc NUTSHELL/nutshell.c LibAsnuApi/LibAsnuApi.c AsnuCrt.c -e _start -o OUT/NUTSHELL/nutshell $(SHARED_CC_FLAGS)
 
 genf2c:
 	@echo "  GENF2C\t../kernel/src/BIN/nutshell.h"

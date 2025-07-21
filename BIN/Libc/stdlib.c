@@ -1,5 +1,5 @@
 #include "stdlib.h"
-#include "../LibAxpApi/AxpApi.h"
+#include "../LibAsnuApi/AsnuApi.h"
 
 #define PAGE_SIZE 4096
 
@@ -51,7 +51,7 @@ void free(void* ptr) {
 }
 
 void exit(int code) {
-    axp_api_exit(code);
+    asnu_api_exit(code);
 }
 
 int getpid() {

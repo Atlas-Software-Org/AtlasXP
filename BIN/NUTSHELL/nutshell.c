@@ -36,7 +36,7 @@ void PrintNutshellLogo() {
 	 printf("|           |\n");
 	 printf("|  _______  |\n");
 	 printf("| | NUTS! | |\n");
-	 printf("| |50%% Off| |\tMk1 - VDISK Version\n");
+	 printf("| |50%% Off| |\n");
 	printf("\\___________/\n\n");
 }
 
@@ -140,7 +140,7 @@ int main(int argc, char** argv, char** envp) {
 }
 
 void cmd_help() {
-	printf("Nutshell v1.0.0 - Commands:\n");
+	printf("NUTSHELL v1.0.0 - Commands:\n");
 	printf("  ascii              Print ASCII table\n");
 	printf("  addusr             Add a user to NUTSHELL\n");
 	printf("  banner             Show NUTSHELL banner\n");
@@ -203,7 +203,7 @@ void cmd_peek() {
 }
 
 void cmd_version() {
-	printf("Nutshell version 1.0.0 - Atlas Software & Microsystems Corp.\n\r");
+	printf("NUTSHELL version 1.0.0 - Atlas Software & Microsystems Corp.\n\r");
 }
 
 void cmd_whoami() {

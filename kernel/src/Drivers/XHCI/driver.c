@@ -8,14 +8,10 @@
 
 #define XHCI_IRQ_VECTOR        0x51
 #define XHCI_CAPLENGTH         0x00
-#define XHCI_HCSPARAMS1        0x04
-#define XHCI_HCSPARAMS2        0x08
-#define XHCI_HCCPARAMS1        0x10
 #define XHCI_DBOFF             0x14
 #define XHCI_RTSOFF            0x18
 #define XHCI_USBCMD            0x00
 #define XHCI_USBSTS            0x04
-#define XHCI_CRCR              0x18
 #define XHCI_DCBAAP            0x30
 #define XHCI_CONFIG            0x38
 #define XHCI_PORTSC_BASE       0x400
@@ -36,16 +32,17 @@ typedef struct {
 } TrbRing_t;
 
 typedef struct {
-    uint64_t base;
-    uint32_t size;
-} EventRingSegmentTable_t;
+    uint64_t RingSegmentBaseAddress;
+    uint32_t RingSegmentSize;
+    uint32_t Reserved;
+} ErstEntry_t __attribute__((packed));
 
 static void* XhciMmioBase;
 static void* XhciRuntimeBase;
 static void* XhciDoorbellBase;
 static uint8_t XhciIrqLine;
 static TrbRing_t EventRing;
-static EventRingSegmentTable_t ERST;
+static ErstEntry_t ErstTable __attribute__((aligned(64)));
 static uint8_t HaveKeyboard = 0;
 static uint8_t HaveMouse = 0;
 
@@ -85,32 +82,27 @@ static void XhciIrqHandler(void) {
 
         if (connected) {
             const char* type = DecodePortSpeed(speed);
-            printk("USB Device attached at port %u, detected type of device as %s\n", portId, type);
+            printk("USB Device attached at port %u, detected type: %s\n", portId, type);
 
             if (speed == 3) {
-                if (HaveKeyboard) {
-                    printk("Warning: Another keyboard was attached. Rejecting.\n");
-                    return;
-                }
+                if (HaveKeyboard) return;
                 HaveKeyboard = 1;
-                printk("USB-Keyboard triggered an interrupt, data retrieved: %02X\n", 0x00);
+                printk("USB-Keyboard triggered IRQ.\n");
             } else if (speed == 2) {
-                if (HaveMouse) {
-                    printk("Warning: Another mouse was attached. Rejecting.\n");
-                    return;
-                }
+                if (HaveMouse) return;
                 HaveMouse = 1;
-                printk("USB-Mouse triggered an interrupt, data retrieved: %02X\n", 0x00);
-            } else {
-                printk("Warning: Non-keyboard/mouse device is not supported. Rejected.\n");
+                printk("USB-Mouse triggered IRQ.\n");
             }
         }
     } else if (trbType == TRB_TYPE_TRANSFER_EVENT) {
-        printk("Transfer Event Received. Data = %02X\n", (uint8_t)(trb[0] & 0xFF));
+        printk("Transfer Event. Data = %02X\n", (uint8_t)(trb[0] & 0xFF));
     }
 
     EventRing.index = (EventRing.index + 1) % XHCI_TRB_RING_SIZE;
     if (EventRing.index == 0) EventRing.cycle ^= 1;
+
+    volatile uint32_t* iman = (volatile uint32_t*)((uintptr_t)XhciRuntimeBase + 0x20);
+    iman[0] |= 0x1;
 
     KiPicSendEoi(XhciIrqLine);
 }
@@ -119,7 +111,7 @@ void xHciInit(PciDevice_t* UsbController) {
     XhciMmioBase = UsbController->MMIOBase;
     XhciIrqLine = UsbController->interrupt_line;
 
-    for (uintptr_t addr = (uintptr_t)XhciMmioBase; addr < (uintptr_t)XhciMmioBase + 0x1000; addr += 0x1000)
+    for (uintptr_t addr = (uintptr_t)XhciMmioBase; addr < (uintptr_t)XhciMmioBase + 0x10000; addr += 0x1000)
         KiMMap((void*)addr, (void*)addr, MMAP_PRESENT | MMAP_RW);
 
     uint32_t capLength = *(volatile uint8_t*)(XhciMmioBase + XHCI_CAPLENGTH);
@@ -129,30 +121,28 @@ void xHciInit(PciDevice_t* UsbController) {
     XhciRuntimeBase = (void*)((uintptr_t)XhciMmioBase + (rtsoff & ~0x1F));
     XhciDoorbellBase = (void*)((uintptr_t)XhciMmioBase + (dboff & ~0x3));
 
-    printk("xHCI MMIO base = %p\n", XhciMmioBase);
-    printk("xHCI Runtime base = %p\n", XhciRuntimeBase);
-    printk("xHCI Doorbell base = %p\n", XhciDoorbellBase);
-    printk("xHCI IRQ line = %u\n", XhciIrqLine);
+    printk("xHCI MMIO = %p, RT = %p, DB = %p, IRQ = %u\n", XhciMmioBase, XhciRuntimeBase, XhciDoorbellBase, XhciIrqLine);
 
     MmioWrite32(XHCI_USBCMD, MmioRead32(XHCI_USBCMD) & ~1);
     while (MmioRead32(XHCI_USBSTS) & 1);
 
-    TrbRing_t* cr = &EventRing;
-    cr->phys = (uintptr_t)cr->ring;
-    cr->cycle = 1;
-    cr->index = 0;
+    EventRing.phys = (uintptr_t)&EventRing.ring;
+    EventRing.cycle = 1;
+    EventRing.index = 0;
 
-    ERST.base = (uint64_t)(uintptr_t)&cr->ring;
-    ERST.size = XHCI_TRB_RING_SIZE;
+    ErstTable.RingSegmentBaseAddress = EventRing.phys;
+    ErstTable.RingSegmentSize = XHCI_TRB_RING_SIZE;
+    ErstTable.Reserved = 0;
+
+    uintptr_t erstPhys = (uintptr_t)&ErstTable;
 
     volatile uint32_t* interrupter = (volatile uint32_t*)((uintptr_t)XhciRuntimeBase + 0x20);
-    interrupter[0] = (uint32_t)(uintptr_t)&ERST;
-    interrupter[1] = (uint32_t)(((uintptr_t)&ERST) >> 32);
+    interrupter[0] = (uint32_t)(erstPhys);
+    interrupter[1] = (uint32_t)(erstPhys >> 32);
     interrupter[2] = 1;
-    interrupter[3] = 0;
 
-    MmioWrite32(XHCI_CRCR, (uint32_t)(cr->phys & ~0xF) | 1);
-    MmioWrite32(XHCI_CRCR + 4, (uint32_t)(cr->phys >> 32));
+    volatile uint32_t* iman = (volatile uint32_t*)((uintptr_t)XhciRuntimeBase + 0x20);
+    iman[0] |= 0x2;
 
     MmioWrite32(XHCI_DCBAAP, 0);
     MmioWrite32(XHCI_DCBAAP + 4, 0);

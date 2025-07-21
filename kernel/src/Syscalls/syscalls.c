@@ -1,4 +1,5 @@
 #include "syscalls.h"
+#include <FS/RamFS/ramfs.h>
 
 extern uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
 
@@ -77,20 +78,24 @@ static void SyscallResetIF() {
 	asm volatile ("sti");
 }
 
-void SyscallHandler(int *__unused) {
-    (void)__unused;
+char CurrentWorkingDirectory[RAMFS_PATH_MAX] = "/";
 
+void SyscallHandler() {
     x86SysVRegState Registers;
     x86GetRegSysV(&Registers);
     
     SyscallResetIF();
 
     switch (Registers.rax) {
-        case AxpOpen:
-        case AxpClose:
+        case AsnuOpen:
+        	Registers.rax = RamFsGetFdFromHandle(RamFsOpen((char*)Registers.rsi));
+        	break;
+        case AsnuClose:
+        	RamFsClose(RamFsGetHandleFromFd(Registers.rsi));
+        	Registers.rax = 0;
             break;
-        case AxpWrite:
-            //if (Registers.rsi == 1 || Registers.rsi == 2) {
+        case AsnuWrite:
+            if (Registers.rsi == 1 || Registers.rsi == 2) {
                 int len = Registers.r10;
                 if (len <= 0) {
                     Registers.rax = 0;
@@ -104,36 +109,58 @@ void SyscallHandler(int *__unused) {
                 }
 
                 Registers.rax = len;
-            //} else {
-            //    Registers.rax = -1;
-            //}
+            } else {
+                Registers.rax = -1;
+            }
             break;
-        case AxpRead:
+        case AsnuRead:
             if (Registers.rsi == 0) {
                 char* out = (char*)(void*)Registers.rdx;
                 uint64_t count = Registers.r10;
                 Registers.rax = KiReadHidSN(out, count);
+            } else {
+            	if (Registers.rsi == 1 || Registers.rsi == 2) Registers.rax = -1;
+            	else {
+            		Registers.rax = RamFsRead(RamFsGetHandleFromFd(Registers.rsi), (void*)Registers.rdx, Registers.r10);
+            	}
             }
             break;
-        case AxpLseek:
-        case AxpSeek:
+        case AsnuLseek:
+        	Registers.rax = RamFsLseek(RamFsGetHandleFromFd(Registers.rsi), Registers.rdx, Registers.r10);
+        	break;
+        case AsnuSeek:
+        	Registers.rax = RamFsSeek(RamFsGetHandleFromFd(Registers.rsi), Registers.rdx);
             break;
-        case AxpGetPid:
+        case AsnuGetPid:
             Registers.rax = CurrentPid;
             break;
-        case AxpExec:
-        case AxpListDir:
-        case AxpChdir:
-        case AxpGetCwd:
-        case AxpCreateDir:
-        case AxpRemoveDir:
-        case AxpRemoveFile:
-        case AxpCreateFile:
-        case AxpExit:
+        case AsnuExec:
+        case AsnuListDir:
+        	Registers.rax = (uint64_t)RamFsList(Registers.rsi);
+        	break;
+        case AsnuChdir:
+        	Registers.rax = -1; /* CHDIR is deprecated, for now */
+        	break;
+        case AsnuGetCwd:
+        	Registers.rax = (uint64_t)CurrentWorkingDirectory;
+        	break;
+        case AsnuCreateDir:
+        	Registers.rax = RamFsRegisterDir((char*)Registers.rsi);
+        	break;
+        case AsnuRemoveDir:
+        	Registers.rax = -1;
+        	break;
+        case AsnuRemoveFile:
+        	Registers.rax = -1;
+        	break;
+        case AsnuCreateFile:
+        	Registers.rax = RamFsRegister((char*)Registers.rsi, (uint8_t*)Registers.rdx, Registers.r10);
+        	break;
+        case AsnuExit:
             do_exit(Registers.rsi, CurrentPid);
             break;
-        case AxpSleep:
-        case AxpMMap:
+        case AsnuSleep:
+        case AsnuMMap:
             uint64_t virt = Registers.rsi;
             uint64_t phys = Registers.rdx;
             uint64_t attr = Registers.r10;
@@ -141,14 +168,14 @@ void SyscallHandler(int *__unused) {
             attr |= MMAP_RW;
             attr |= MMAP_PRESENT;
 
-            if (0x400000 <= virt && virt < 0x500000) {}
+            if (0x400000 <= virt && virt < 0x1000000) {}
             else {
                 KiPanic("SBD: Detected security breach by process, quitting process", 0);
                 do_exit(0xFFFFFFFFFFFFFFFF, CurrentPid);
                 break;
             }
 
-            if (0x400000 <= phys && phys < 0x500000) {}
+            if (0x400000 <= phys && phys < 0x1000000) {}
             else {
                 KiPanic("SBD: Detected security breach by process, quitting process", 0);
                 do_exit(0xFFFFFFFFFFFFFFFF, CurrentPid);
@@ -157,28 +184,36 @@ void SyscallHandler(int *__unused) {
 
             KiMMap((void*)virt, (void*)phys, attr);
             break;
-        case AxpMUmap:
+        case AsnuMUmap:
             KiUMap((void*)Registers.rsi);
             break;
-        case AxpAlloc:
+        case AsnuAlloc:
         	void* address_alloc = KiPmmAlloc();
         	Registers.rax = (uint64_t)address_alloc;
         	break;
-        case AxpFree:
+        case AsnuFree:
         	KiPmmFree((void*)Registers.rsi);
         	break;
-        case AxpRename:
-        case AxpDup:
-        case AxpCut:
-        case AxpTime:
-        case AxpSystemUptime:
-        case AxpGetDeviceHandle:
-        case AxpPowerModeSet:
+        case AsnuRename:
+        case AsnuDup:
+        	/* This is easy, just get the file the program wants to duplicate,
+        	 * and create another copy of it, but make sure that the copy name is "{ORIGINAL_NAME} (Number of copies - 1)" */
+			Registers.rax = -1;
+			break;
+        case AsnuCut:
+        	/* Unless RamFsUnlink exists, this wont be a thing */
+        	Registers.rax = -1;
+        	break;
+        case AsnuTime:
+        case AsnuSystemUptime:
+        case AsnuGetDeviceHandle:
+        case AsnuPowerModeSet:
+        	Registers.rax = -1;
             break;
-        case AxpGetTermWidth:
+        case AsnuGetTermWidth:
         	Registers.rax = FB_FLANTERM_CHAR_WIDTH;
         	break;
-        case AxpGetTermHeight:
+        case AsnuGetTermHeight:
         	Registers.rax = FB_FLANTERM_CHAR_HEIGHT;
     }
 

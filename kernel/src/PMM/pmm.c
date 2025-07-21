@@ -15,8 +15,10 @@ static PmmManager pmm;
 /* Kernel-callable PMM initialization
    bitmap_mem points to preallocated memory for the bitmap
 */
-int KiPmmInit(uint64_t total_mem_bytes, uint32_t page_size, uint8_t *bitmap_mem, size_t bitmap_mem_size, size_t endKernelAligned_) {
-    (void)endKernelAligned_;
+int KiPmmInit(uint64_t total_mem_bytes, uint32_t page_size, uint8_t *bitmap_mem, size_t bitmap_mem_size, size_t endKernelAligned_, int _void_end_k) {
+	if (_void_end_k)
+    	(void)endKernelAligned_; /* This is why the PMM allocates at address 0, but i will keep it for now since ASNU is not meant to support Lenovo (as of now of course)
+    								Due to the stupid reservation of 0x0000000000000000-0x000000000009FFFF even for UEFI */
     pmm.total_pages = total_mem_bytes / page_size;
     pmm.free_pages = pmm.total_pages;
     pmm.bitmap_size_bytes = (pmm.total_pages + 7) / 8;

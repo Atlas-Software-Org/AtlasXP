@@ -1,5 +1,5 @@
 #include "stdio.h"
-#include "../LibAxpApi/AxpApi.h"
+#include "../LibAsnuApi/AsnuApi.h"
 
 FILE* stdin = (FILE*)0;
 FILE* stdout = (FILE*)1;

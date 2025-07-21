@@ -5,5 +5,5 @@ GLOBAL KiSyscallHandler
 EXTERN SyscallHandler
 
 KiSyscallHandler:
-	call SyscallHandler
-	iretq
+    call SyscallHandler
+    iretq

@@ -25,6 +25,7 @@
 #include <BIN/nutshell.h>
 
 #include <FS/FAT32/fat32.h>
+#include <FS/RamFS/ramfs.h>
 
 __attribute__((used, section(".limine_requests")))
 static volatile LIMINE_BASE_REVISION(3);
@@ -77,6 +78,21 @@ void DisplaySplash(int w, int h, char* text);
 uint64_t FB_WIDTH, FB_HEIGHT, FB_FLANTERM_CHAR_WIDTH, FB_FLANTERM_CHAR_HEIGHT;
 uint64_t HhdmOffset;
 uint64_t RamSize = 0;
+
+static const uint8_t DocContent[] =
+"Welcome to ASNU-Kernel, if this is the first time you are using the ASNU-Kernel:\n\r"
+"List of features:\n\r"
+"- ELF Loader (static non-relocatable ELF files)\n\r"
+"- Basic AHCI driver\n\r"
+"- Fully working PS/2 keyboard driver\n\r";
+static const uint8_t AboutContent[] = "ASNU-Kernel Project Version 1.0.0.2025-rc1 (25'H2'Q3)\n\rThanks for using ASNU-Kernel!\n\r\n\rProduced by Atlas Software & Microsystems Corp.\n\rLicensed under GPL-2.0 license\n\r";
+
+void InitRamFS(void) {
+	RamFsInit();
+	RamFsRegisterDir("/docs/");
+	RamFsRegister("/docs/readme.txt", DocContent, sizeof(DocContent) - 1);
+	RamFsRegister("/docs/about.txt", AboutContent, sizeof(AboutContent) - 1);
+}
 
 void KiStartupInit(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
@@ -138,19 +154,23 @@ void KiStartupInit(void) {
 
     KiGdtInit();
 
+	/* FIXME:
+
 	PciDevice_t xHciController = PciFindDeviceByClass(0x0C, 0x03);
 	if (xHciController.vendor_id == 0xFFFF)
 		KiPanic("Could not find an xHCI controller attached", 1);
 	PciGetDeviceMMIORegion(&xHciController);
 
 	xHciInit(&xHciController);
+
+	*/
     
     idtr_t idtr = KiIdtInit();
     (void)idtr;
 
     uint8_t bitmap_mem[(0x16636F60 / 0x1000 + 7) / 8];  /* preallocated bitmap */
 
-    int pmm_status = KiPmmInit(0x16636F60, 0x1000, bitmap_mem, sizeof(bitmap_mem), endKernelAligned);
+    int pmm_status = KiPmmInit(0x16636F60, 0x1000, bitmap_mem, sizeof(bitmap_mem), endKernelAligned, 1);
     if (pmm_status != 0) {
         printk("{ LOG }\tFailed to initialize PMM, error code %d / 0x%x\n", pmm_status, pmm_status);
         hcf();
@@ -201,10 +221,9 @@ void KiStartupInit(void) {
 	
 	AhciInit(&MassStoragePci);
 
-	hcf();
+	InitRamFS();
 
     printk("\e[2J\e[H");
-
     LoadKernelElf((void*)nutshell, 0, 0, 0);
 
     hcf();

@@ -1,0 +1,27 @@
+ASNU-Kernel Project
+===================
+
+Version Information:
+  - Full form version: Version 1.0.0.2025-rc2-25/H2/Q3
+  - Basic form version: Version 1.0.0.2025-rc2 / Version 25H2Q3-rc2
+  - Simple form version: Version 1.2025
+
+Produced by:
+Atlas Software & Microsystems
+
+Work Team:
+  - Leader: Adam Bassem
+  - Senior software engineer: Janick
+  - Head of web development department: Aksh Tiwari
+  - Management: Donovan
+  - Lead developer: Gabriel
+
+Leave your feedback on GitHub!
+
+Changelog of Version 1.0.0.2025-rc2-25/H2/Q3:
+  - Added RamFS
+  - Added RamFS system calls
+  - Corrected branding case for "NUTSHELL" (previously "Nutshell")
+  - Transitioned the kernel to an exokernel architecture — minimal core, userland-defined policies (for now... or forever)
+
+For the .hdd file check the releases section in the GitHub repository

@@ -8,37 +8,37 @@
 #include <ELF/elf.h>
 #include <stdint.h>
 
-#define AxpOpen         0
-#define AxpClose        1
-#define AxpWrite        2
-#define AxpRead         3
-#define AxpLseek        4
-#define AxpSeek         5
-#define AxpGetPid       6
-#define AxpExec         7
-#define AxpListDir      8
-#define AxpChdir        9
-#define AxpGetCwd       10
-#define AxpCreateDir    11
-#define AxpRemoveDir    12
-#define AxpRemoveFile   13
-#define AxpCreateFile   14
-#define AxpExit         15
-#define AxpSleep        16
-#define AxpMMap         17
-#define AxpMUmap        18
-#define AxpAlloc        19
-#define AxpFree         20
-#define AxpRename       21
-#define AxpDup          22 /* Duplicate: <FILE> -> <FILE> (IDX)*/
-#define AxpCut          23 /* Move file */
-#define AxpTime         24
-#define AxpSystemUptime 25
-#define AxpGetDeviceHandle 26
-#define AxpPowerModeSet 27
-#define AxpGetTermWidth 28
-#define AxpGetTermHeight 29
+#define AsnuOpen         0
+#define AsnuClose        1
+#define AsnuWrite        2
+#define AsnuRead         3
+#define AsnuLseek        4
+#define AsnuSeek         5
+#define AsnuGetPid       6
+#define AsnuExec         7
+#define AsnuListDir      8
+#define AsnuChdir        9
+#define AsnuGetCwd       10
+#define AsnuCreateDir    11
+#define AsnuRemoveDir    12
+#define AsnuRemoveFile   13
+#define AsnuCreateFile   14
+#define AsnuExit         15
+#define AsnuSleep        16
+#define AsnuMMap         17
+#define AsnuMUmap        18
+#define AsnuAlloc        19
+#define AsnuFree         20
+#define AsnuRename       21
+#define AsnuDup          22 /* Duplicate: <FILE> -> <FILE> (IDX)*/
+#define AsnuCut          23 /* Move file */
+#define AsnuTime         24
+#define AsnuSystemUptime 25
+#define AsnuGetDeviceHandle 26
+#define AsnuPowerModeSet 27
+#define AsnuGetTermWidth 28
+#define AsnuGetTermHeight 29
 
-void KiSyscallHandler();
+extern void KiSyscallHandler();
 
 #endif /* SYSCALLS_H */
